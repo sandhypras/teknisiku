@@ -2,11 +2,13 @@ import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../core/config/app_config.dart';
+import '../core/models/app_user_profile.dart' as admin_models;
 import '../core/models/mobile_models.dart';
 import '../core/services/auth_service.dart';
 import '../features/auth/login_page.dart';
 import '../features/auth/register_customer_page.dart';
 import '../features/auth/register_technician_page.dart';
+import '../features/admin/admin_shell.dart';
 import '../features/customer/customer_shell_page.dart';
 import '../features/guest/home_page.dart';
 import '../features/technician/technician_shell_page.dart';
@@ -93,8 +95,14 @@ class _AuthGateState extends State<AuthGate> {
                 profile: profile,
                 authService: widget.authService,
               ),
-              AppRole.admin => CustomerShellPage(
-                profile: profile,
+              AppRole.admin => AdminShell(
+                profile: admin_models.AppUserProfile(
+                  id: profile.id,
+                  email: profile.email,
+                  fullName: profile.fullName,
+                  role: admin_models.AppRole.admin,
+                  isActive: profile.isActive,
+                ),
                 authService: widget.authService,
               ),
               AppRole.customer => CustomerShellPage(

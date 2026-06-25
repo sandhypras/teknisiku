@@ -43,8 +43,8 @@ class _LoginPageState extends State<LoginPage> {
     });
     try {
       await _authService.signIn(
-        _emailController.text.trim(),
-        _passwordController.text,
+        email: _emailController.text.trim(),
+        password: _passwordController.text,
       );
       if (mounted) Navigator.of(context).popUntil((route) => route.isFirst);
     } catch (error) {

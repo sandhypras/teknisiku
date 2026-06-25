@@ -11,9 +11,15 @@ class AppConfig {
     }
   }
 
-  static String get supabaseUrl => dotenv.env['SUPABASE_URL'] ?? '';
+  static String get supabaseUrl {
+    const value = String.fromEnvironment('SUPABASE_URL');
+    return value.isNotEmpty ? value : dotenv.env['SUPABASE_URL'] ?? '';
+  }
 
-  static String get supabaseAnonKey => dotenv.env['SUPABASE_ANON_KEY'] ?? '';
+  static String get supabaseAnonKey {
+    const value = String.fromEnvironment('SUPABASE_ANON_KEY');
+    return value.isNotEmpty ? value : dotenv.env['SUPABASE_ANON_KEY'] ?? '';
+  }
 
   static bool get hasSupabaseConfig =>
       supabaseUrl.trim().isNotEmpty && supabaseAnonKey.trim().isNotEmpty;

@@ -6,7 +6,9 @@ import 'core/config/app_config.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
+
   await AppConfig.load();
+
   if (AppConfig.hasSupabaseConfig) {
     await Supabase.initialize(
       url: AppConfig.supabaseUrl,
@@ -16,5 +18,6 @@ Future<void> main() async {
       anonKey: AppConfig.supabaseAnonKey,
     );
   }
+
   runApp(const SiTeknisiApp());
 }
