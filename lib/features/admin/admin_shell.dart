@@ -2,6 +2,11 @@ import 'package:flutter/material.dart';
 
 import '../../core/models/app_user_profile.dart';
 import '../../core/services/auth_service.dart';
+import 'admin_commission_screen.dart';
+import 'admin_payments_screen.dart';
+import 'admin_reports_screen.dart';
+import 'admin_reviews_screen.dart';
+import 'admin_settings_screen.dart';
 import 'categories/admin_categories_screen.dart';
 import 'customers/admin_customers_screen.dart';
 import 'dashboard/admin_dashboard_screen.dart';
@@ -11,26 +16,26 @@ import 'technicians/admin_technicians_screen.dart';
 
 // ─── Warna Branding Si Teknisi ───────────────────────────────────────────────
 abstract class AppColors {
-  static const primaryBlue   = Color(0xFF0D72BD);
+  static const primaryBlue = Color(0xFF0D72BD);
   static const secondaryBlue = Color(0xFF2283C6);
-  static const lightBlue     = Color(0xFF3A97D3);
-  static const softBlue      = Color(0xFFA1C9E4);
-  static const darkBlue      = Color(0xFF0A4F86);
-  static const bgPage        = Color(0xFFF5F9FC);
-  static const cardWhite     = Color(0xFFFFFFFF);
-  static const border        = Color(0xFFDCEAF4);
-  static const iconBg        = Color(0xFFEAF5FC);
-  static const textPrimary   = Color(0xFF16324F);
+  static const lightBlue = Color(0xFF3A97D3);
+  static const softBlue = Color(0xFFA1C9E4);
+  static const darkBlue = Color(0xFF0A4F86);
+  static const bgPage = Color(0xFFF5F9FC);
+  static const cardWhite = Color(0xFFFFFFFF);
+  static const border = Color(0xFFDCEAF4);
+  static const iconBg = Color(0xFFEAF5FC);
+  static const textPrimary = Color(0xFF16324F);
   static const textSecondary = Color(0xFF64748B);
-  static const success       = Color(0xFF22C55E);
-  static const warning       = Color(0xFFF59E0B);
-  static const error         = Color(0xFFEF4444);
+  static const success = Color(0xFF22C55E);
+  static const warning = Color(0xFFF59E0B);
+  static const error = Color(0xFFEF4444);
 
   // alias tetap agar screen lama tidak rusak
-  static const primary    = primaryBlue;
+  static const primary = primaryBlue;
   static const background = bgPage;
-  static const teal       = lightBlue;
-  static const amber      = warning;
+  static const teal = lightBlue;
+  static const amber = warning;
 
   static const sidebarGradient = LinearGradient(
     begin: Alignment.topCenter,
@@ -48,7 +53,11 @@ abstract class AppColors {
 
 // ─── Nav Item ────────────────────────────────────────────────────────────────
 class _NavItem {
-  const _NavItem({required this.icon, required this.label, required this.index});
+  const _NavItem({
+    required this.icon,
+    required this.label,
+    required this.index,
+  });
   final IconData icon;
   final String label;
   final int index;
@@ -74,18 +83,22 @@ class _AdminShellState extends State<AdminShell> {
   bool _sidebarCollapsed = false;
 
   static const _navItems = [
-    _NavItem(icon: Icons.dashboard_outlined,          label: 'Dashboard',          index: 0),
-    _NavItem(icon: Icons.people_outline,              label: 'Customer',           index: 1),
-    _NavItem(icon: Icons.engineering_outlined,        label: 'Teknisi',            index: 2),
-    _NavItem(icon: Icons.verified_user_outlined,      label: 'Verifikasi Teknisi', index: 3),
-    _NavItem(icon: Icons.category_outlined,           label: 'Kategori',           index: 4),
-    _NavItem(icon: Icons.build_outlined,              label: 'Layanan',            index: 5),
-    _NavItem(icon: Icons.receipt_long_outlined,       label: 'Order',              index: 6),
-    _NavItem(icon: Icons.payment_outlined,            label: 'Pembayaran',         index: 7),
-    _NavItem(icon: Icons.star_outline_rounded,        label: 'Ulasan',             index: 8),
-    _NavItem(icon: Icons.percent_outlined,            label: 'Komisi',             index: 9),
-    _NavItem(icon: Icons.bar_chart_outlined,          label: 'Laporan',            index: 10),
-    _NavItem(icon: Icons.settings_outlined,           label: 'Pengaturan',         index: 11),
+    _NavItem(icon: Icons.dashboard_outlined, label: 'Dashboard', index: 0),
+    _NavItem(icon: Icons.people_outline, label: 'Customer', index: 1),
+    _NavItem(icon: Icons.engineering_outlined, label: 'Teknisi', index: 2),
+    _NavItem(
+      icon: Icons.verified_user_outlined,
+      label: 'Verifikasi Teknisi',
+      index: 3,
+    ),
+    _NavItem(icon: Icons.category_outlined, label: 'Kategori', index: 4),
+    _NavItem(icon: Icons.build_outlined, label: 'Layanan', index: 5),
+    _NavItem(icon: Icons.receipt_long_outlined, label: 'Order', index: 6),
+    _NavItem(icon: Icons.payment_outlined, label: 'Pembayaran', index: 7),
+    _NavItem(icon: Icons.star_outline_rounded, label: 'Ulasan', index: 8),
+    _NavItem(icon: Icons.percent_outlined, label: 'Komisi', index: 9),
+    _NavItem(icon: Icons.bar_chart_outlined, label: 'Laporan', index: 10),
+    _NavItem(icon: Icons.settings_outlined, label: 'Pengaturan', index: 11),
   ];
 
   List<Widget> get _screens => [
@@ -96,11 +109,11 @@ class _AdminShellState extends State<AdminShell> {
     const AdminCategoriesScreen(),
     const AdminServicesScreen(),
     const AdminOrdersScreen(),
-    const _PlaceholderScreen(title: 'Pembayaran'),
-    const _PlaceholderScreen(title: 'Ulasan'),
-    const _PlaceholderScreen(title: 'Komisi'),
-    const _PlaceholderScreen(title: 'Laporan'),
-    const _PlaceholderScreen(title: 'Pengaturan'),
+    const AdminPaymentsScreen(),
+    const AdminReviewsScreen(),
+    const AdminCommissionScreen(),
+    const AdminReportsScreen(),
+    const AdminSettingsScreen(),
   ];
 
   @override
@@ -197,7 +210,11 @@ class _Sidebar extends StatelessWidget {
           AnimatedContainer(
             duration: const Duration(milliseconds: 220),
             padding: EdgeInsets.fromLTRB(
-                collapsed ? 12 : 20, 28, collapsed ? 12 : 20, 20),
+              collapsed ? 12 : 20,
+              28,
+              collapsed ? 12 : 20,
+              20,
+            ),
             child: collapsed
                 ? Center(
                     child: Container(
@@ -279,7 +296,9 @@ class _Sidebar extends StatelessWidget {
           Expanded(
             child: ListView(
               padding: EdgeInsets.symmetric(
-                  horizontal: collapsed ? 8 : 12, vertical: 0),
+                horizontal: collapsed ? 8 : 12,
+                vertical: 0,
+              ),
               children: items.map((item) {
                 final selected = item.index == selectedIndex;
                 return _SidebarItem(
@@ -311,9 +330,10 @@ class _Sidebar extends StatelessWidget {
                           ? profile.fullName[0].toUpperCase()
                           : 'A',
                       style: const TextStyle(
-                          color: Colors.white,
-                          fontWeight: FontWeight.bold,
-                          fontSize: 14),
+                        color: Colors.white,
+                        fontWeight: FontWeight.bold,
+                        fontSize: 14,
+                      ),
                     ),
                   ),
                   const SizedBox(width: 10),
@@ -324,16 +344,18 @@ class _Sidebar extends StatelessWidget {
                         Text(
                           profile.fullName.isEmpty ? 'Admin' : profile.fullName,
                           style: const TextStyle(
-                              color: Colors.white,
-                              fontSize: 12,
-                              fontWeight: FontWeight.w600),
+                            color: Colors.white,
+                            fontSize: 12,
+                            fontWeight: FontWeight.w600,
+                          ),
                           overflow: TextOverflow.ellipsis,
                         ),
                         Text(
                           'Administrator',
                           style: TextStyle(
-                              color: Colors.white.withValues(alpha: 0.6),
-                              fontSize: 10),
+                            color: Colors.white.withValues(alpha: 0.6),
+                            fontSize: 10,
+                          ),
                         ),
                       ],
                     ),
@@ -343,8 +365,11 @@ class _Sidebar extends StatelessWidget {
                     borderRadius: BorderRadius.circular(8),
                     child: Padding(
                       padding: const EdgeInsets.all(6),
-                      child: Icon(Icons.logout_outlined,
-                          color: Colors.white.withValues(alpha: 0.7), size: 18),
+                      child: Icon(
+                        Icons.logout_outlined,
+                        color: Colors.white.withValues(alpha: 0.7),
+                        size: 18,
+                      ),
                     ),
                   ),
                 ],
@@ -354,8 +379,11 @@ class _Sidebar extends StatelessWidget {
             Padding(
               padding: const EdgeInsets.symmetric(vertical: 12),
               child: IconButton(
-                icon: Icon(Icons.logout_outlined,
-                    color: Colors.white.withValues(alpha: 0.7), size: 20),
+                icon: Icon(
+                  Icons.logout_outlined,
+                  color: Colors.white.withValues(alpha: 0.7),
+                  size: 20,
+                ),
                 onPressed: onSignOut,
                 tooltip: 'Keluar',
               ),
@@ -410,13 +438,12 @@ class _SidebarItemState extends State<_SidebarItem> {
               color: active
                   ? Colors.white.withValues(alpha: 0.18)
                   : hovered
-                      ? Colors.white.withValues(alpha: 0.08)
-                      : Colors.transparent,
+                  ? Colors.white.withValues(alpha: 0.08)
+                  : Colors.transparent,
               borderRadius: BorderRadius.circular(10),
               border: active
                   ? Border(
-                      left: const BorderSide(
-                          color: Colors.white, width: 3),
+                      left: const BorderSide(color: Colors.white, width: 3),
                     )
                   : null,
             ),
@@ -526,12 +553,19 @@ class _Topbar extends StatelessWidget {
               decoration: InputDecoration(
                 hintText: 'Cari...',
                 hintStyle: TextStyle(
-                    fontSize: 13, color: AppColors.textSecondary),
-                prefixIcon: Icon(Icons.search_outlined,
-                    size: 18, color: AppColors.textSecondary),
+                  fontSize: 13,
+                  color: AppColors.textSecondary,
+                ),
+                prefixIcon: Icon(
+                  Icons.search_outlined,
+                  size: 18,
+                  color: AppColors.textSecondary,
+                ),
                 border: InputBorder.none,
-                contentPadding:
-                    EdgeInsets.symmetric(vertical: 8, horizontal: 8),
+                contentPadding: EdgeInsets.symmetric(
+                  vertical: 8,
+                  horizontal: 8,
+                ),
               ),
             ),
           ),
@@ -549,8 +583,11 @@ class _Topbar extends StatelessWidget {
                   borderRadius: BorderRadius.circular(10),
                   border: Border.all(color: AppColors.border),
                 ),
-                child: const Icon(Icons.notifications_outlined,
-                    size: 20, color: AppColors.textSecondary),
+                child: const Icon(
+                  Icons.notifications_outlined,
+                  size: 20,
+                  color: AppColors.textSecondary,
+                ),
               ),
               Positioned(
                 right: -2,
@@ -563,11 +600,14 @@ class _Topbar extends StatelessWidget {
                     shape: BoxShape.circle,
                   ),
                   child: const Center(
-                    child: Text('3',
-                        style: TextStyle(
-                            color: Colors.white,
-                            fontSize: 9,
-                            fontWeight: FontWeight.bold)),
+                    child: Text(
+                      '3',
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontSize: 9,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
                   ),
                 ),
               ),
@@ -586,9 +626,10 @@ class _Topbar extends StatelessWidget {
                       ? profile.fullName[0].toUpperCase()
                       : 'A',
                   style: const TextStyle(
-                      color: Colors.white,
-                      fontWeight: FontWeight.bold,
-                      fontSize: 13),
+                    color: Colors.white,
+                    fontWeight: FontWeight.bold,
+                    fontSize: 13,
+                  ),
                 ),
               ),
               const SizedBox(width: 8),
@@ -599,31 +640,45 @@ class _Topbar extends StatelessWidget {
                   Text(
                     profile.fullName.isEmpty ? 'Admin' : profile.fullName,
                     style: const TextStyle(
-                        fontSize: 12,
-                        fontWeight: FontWeight.w600,
-                        color: AppColors.textPrimary),
+                      fontSize: 12,
+                      fontWeight: FontWeight.w600,
+                      color: AppColors.textPrimary,
+                    ),
                   ),
-                  const Text('Admin Si Teknisi',
-                      style: TextStyle(
-                          fontSize: 10, color: AppColors.textSecondary)),
+                  const Text(
+                    'Admin Si Teknisi',
+                    style: TextStyle(
+                      fontSize: 10,
+                      color: AppColors.textSecondary,
+                    ),
+                  ),
                 ],
               ),
               const SizedBox(width: 4),
               PopupMenuButton<String>(
-                icon: const Icon(Icons.keyboard_arrow_down_rounded,
-                    size: 18, color: AppColors.textSecondary),
+                icon: const Icon(
+                  Icons.keyboard_arrow_down_rounded,
+                  size: 18,
+                  color: AppColors.textSecondary,
+                ),
                 shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(10)),
+                  borderRadius: BorderRadius.circular(10),
+                ),
                 itemBuilder: (_) => [
                   const PopupMenuItem(
                     value: 'logout',
                     child: Row(
                       children: [
-                        Icon(Icons.logout_outlined,
-                            size: 16, color: AppColors.error),
+                        Icon(
+                          Icons.logout_outlined,
+                          size: 16,
+                          color: AppColors.error,
+                        ),
                         SizedBox(width: 8),
-                        Text('Keluar',
-                            style: TextStyle(color: AppColors.error)),
+                        Text(
+                          'Keluar',
+                          style: TextStyle(color: AppColors.error),
+                        ),
                       ],
                     ),
                   ),
@@ -671,11 +726,14 @@ class _MobileLayout extends StatelessWidget {
           children: [
             Image.asset('assets/logos/logoku.png', width: 28, height: 28),
             const SizedBox(width: 8),
-            const Text('Si Teknisi Admin',
-                style: TextStyle(
-                    color: Colors.white,
-                    fontSize: 16,
-                    fontWeight: FontWeight.bold)),
+            const Text(
+              'Si Teknisi Admin',
+              style: TextStyle(
+                color: Colors.white,
+                fontSize: 16,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
           ],
         ),
         flexibleSpace: Container(
@@ -695,10 +753,13 @@ class _MobileLayout extends StatelessWidget {
         indicatorColor: AppColors.iconBg,
         onDestinationSelected: onSelect,
         destinations: bottomItems
-            .map((e) => NavigationDestination(
+            .map(
+              (e) => NavigationDestination(
                 icon: Icon(e.icon, color: AppColors.textSecondary),
                 selectedIcon: Icon(e.icon, color: AppColors.primaryBlue),
-                label: e.label))
+                label: e.label,
+              ),
+            )
             .toList(),
       ),
     );
@@ -706,45 +767,6 @@ class _MobileLayout extends StatelessWidget {
 }
 
 // ─── Placeholder Screen ───────────────────────────────────────────────────────
-class _PlaceholderScreen extends StatelessWidget {
-  const _PlaceholderScreen({required this.title});
-  final String title;
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: AppColors.bgPage,
-      body: Center(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Container(
-              width: 80,
-              height: 80,
-              decoration: BoxDecoration(
-                color: AppColors.iconBg,
-                borderRadius: BorderRadius.circular(20),
-              ),
-              child: const Icon(Icons.construction_outlined,
-                  size: 40, color: AppColors.primaryBlue),
-            ),
-            const SizedBox(height: 20),
-            Text(title,
-                style: const TextStyle(
-                    fontSize: 20,
-                    fontWeight: FontWeight.bold,
-                    color: AppColors.darkBlue)),
-            const SizedBox(height: 8),
-            const Text('Halaman ini sedang dalam pengembangan',
-                style: TextStyle(
-                    fontSize: 14, color: AppColors.textSecondary)),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
 // ─── Shared Admin Widgets ─────────────────────────────────────────────────────
 
 class AdminPageHeader extends StatelessWidget {
@@ -769,15 +791,22 @@ class AdminPageHeader extends StatelessWidget {
           Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text(title,
-                  style: const TextStyle(
-                      fontSize: 22,
-                      fontWeight: FontWeight.bold,
-                      color: AppColors.darkBlue)),
+              Text(
+                title,
+                style: const TextStyle(
+                  fontSize: 22,
+                  fontWeight: FontWeight.bold,
+                  color: AppColors.darkBlue,
+                ),
+              ),
               const SizedBox(height: 2),
-              Text(subtitle,
-                  style: const TextStyle(
-                      fontSize: 13, color: AppColors.textSecondary)),
+              Text(
+                subtitle,
+                style: const TextStyle(
+                  fontSize: 13,
+                  color: AppColors.textSecondary,
+                ),
+              ),
             ],
           ),
           const Spacer(),
@@ -809,15 +838,21 @@ class AdminEmptyState extends StatelessWidget {
               color: AppColors.iconBg,
               borderRadius: BorderRadius.circular(20),
             ),
-            child: const Icon(Icons.inbox_outlined,
-                size: 40, color: AppColors.softBlue),
+            child: const Icon(
+              Icons.inbox_outlined,
+              size: 40,
+              color: AppColors.softBlue,
+            ),
           ),
           const SizedBox(height: 16),
-          Text(message,
-              style: const TextStyle(
-                  fontSize: 14,
-                  color: AppColors.textSecondary,
-                  fontWeight: FontWeight.w500)),
+          Text(
+            message,
+            style: const TextStyle(
+              fontSize: 14,
+              color: AppColors.textSecondary,
+              fontWeight: FontWeight.w500,
+            ),
+          ),
         ],
       ),
     );
@@ -839,16 +874,211 @@ class AdminStatusBadge extends StatelessWidget {
   Widget build(BuildContext context) {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-      decoration:
-          BoxDecoration(color: bg, borderRadius: BorderRadius.circular(20)),
-      child: Text(label,
-          style: TextStyle(
-              fontSize: 11, color: color, fontWeight: FontWeight.w600)),
+      decoration: BoxDecoration(
+        color: bg,
+        borderRadius: BorderRadius.circular(20),
+      ),
+      child: Text(
+        label,
+        style: TextStyle(
+          fontSize: 11,
+          color: color,
+          fontWeight: FontWeight.w600,
+        ),
+      ),
     );
   }
 }
 
 // ─── Reusable Primary Button ──────────────────────────────────────────────────
+class AdminDataCard extends StatelessWidget {
+  const AdminDataCard({required this.child, super.key});
+
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      margin: const EdgeInsets.only(bottom: 12),
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: AppColors.cardWhite,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: AppColors.border),
+        boxShadow: const [
+          BoxShadow(
+            color: Color(0x080A4F86),
+            blurRadius: 8,
+            offset: Offset(0, 2),
+          ),
+        ],
+      ),
+      child: child,
+    );
+  }
+}
+
+class AdminInfoChip extends StatelessWidget {
+  const AdminInfoChip({required this.icon, required this.label, super.key});
+
+  final IconData icon;
+  final String label;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+      decoration: BoxDecoration(
+        color: AppColors.bgPage,
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: AppColors.border),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 14, color: AppColors.textSecondary),
+          const SizedBox(width: 5),
+          Text(
+            label,
+            style: const TextStyle(
+              color: AppColors.textSecondary,
+              fontSize: 12,
+              fontWeight: FontWeight.w500,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class AdminMetricTile extends StatelessWidget {
+  const AdminMetricTile({
+    required this.label,
+    required this.value,
+    required this.icon,
+    required this.color,
+    super.key,
+  });
+
+  final String label;
+  final String value;
+  final IconData icon;
+  final Color color;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      constraints: const BoxConstraints(minWidth: 220),
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: AppColors.cardWhite,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: AppColors.border),
+      ),
+      child: Row(
+        children: [
+          Container(
+            width: 44,
+            height: 44,
+            decoration: BoxDecoration(
+              color: color.withValues(alpha: 0.12),
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: Icon(icon, color: color, size: 22),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Text(
+                  value,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    color: AppColors.textPrimary,
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                Text(
+                  label,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    color: AppColors.textSecondary,
+                    fontSize: 12,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class AdminErrorState extends StatelessWidget {
+  const AdminErrorState({
+    required this.message,
+    required this.onRetry,
+    super.key,
+  });
+
+  final String message;
+  final VoidCallback onRetry;
+
+  @override
+  Widget build(BuildContext context) {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(24),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Icon(
+              Icons.error_outline_rounded,
+              size: 46,
+              color: AppColors.error,
+            ),
+            const SizedBox(height: 12),
+            const Text(
+              'Gagal memuat data',
+              style: TextStyle(
+                color: AppColors.textPrimary,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+            const SizedBox(height: 6),
+            Text(
+              message,
+              textAlign: TextAlign.center,
+              style: const TextStyle(
+                color: AppColors.textSecondary,
+                fontSize: 12,
+              ),
+            ),
+            const SizedBox(height: 16),
+            FilledButton.icon(
+              onPressed: onRetry,
+              icon: const Icon(Icons.refresh_rounded, size: 18),
+              label: const Text('Coba lagi'),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+String formatRupiah(double amount) {
+  if (amount == 0) return 'Rp 0';
+  return 'Rp ${amount.toStringAsFixed(0).replaceAllMapped(RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'), (match) => '${match[1]}.')}';
+}
+
 class _PrimaryButton extends StatelessWidget {
   const _PrimaryButton({
     required this.label,
@@ -876,14 +1106,17 @@ class _PrimaryButton extends StatelessWidget {
       child: ElevatedButton.icon(
         onPressed: onPressed,
         icon: Icon(icon ?? Icons.check_outlined, size: 16, color: Colors.white),
-        label: Text(label,
-            style: const TextStyle(color: Colors.white, fontSize: 13)),
+        label: Text(
+          label,
+          style: const TextStyle(color: Colors.white, fontSize: 13),
+        ),
         style: ElevatedButton.styleFrom(
           backgroundColor: Colors.transparent,
           shadowColor: Colors.transparent,
           padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 10),
-          shape:
-              RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(10),
+          ),
         ),
       ),
     );

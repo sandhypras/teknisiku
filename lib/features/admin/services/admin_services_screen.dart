@@ -23,7 +23,8 @@ class _AdminServicesScreenState extends State<AdminServicesScreen>
     super.initState();
     _tabController = TabController(length: _tabs.length, vsync: this);
     _tabController.addListener(
-        () => setState(() => _future = _fetch(_filters[_tabController.index])));
+      () => setState(() => _future = _fetch(_filters[_tabController.index])),
+    );
     _future = _fetch(null);
   }
 
@@ -34,19 +35,24 @@ class _AdminServicesScreenState extends State<AdminServicesScreen>
   }
 
   Future<List<Map<String, dynamic>>> _fetch(String? status) async {
-    final q = Supabase.instance.client.from('services').select(
-        'id, name, description, estimated_price, estimated_duration, approval_status, is_active, created_at, category:categories(name), technician:technician_profiles!technician_id(profile:profiles!user_id(full_name))');
+    final q = Supabase.instance.client
+        .from('services')
+        .select(
+          'id, name, description, estimated_price, estimated_duration, approval_status, is_active, created_at, category:categories(name), technician:technician_profiles!technician_id(profile:profiles!user_id(full_name))',
+        );
     final data = status != null
-        ? await q.eq('approval_status', status).order('created_at', ascending: false)
+        ? await q
+              .eq('approval_status', status)
+              .order('created_at', ascending: false)
         : await q.order('created_at', ascending: false);
     return List<Map<String, dynamic>>.from(data);
   }
 
   Future<void> _updateStatus(String id, String status, {String? reason}) async {
-    await Supabase.instance.client.from('services').update({
-      'approval_status': status,
-      if (reason != null) 'rejection_reason': reason,
-    }).eq('id', id);
+    await Supabase.instance.client
+        .from('services')
+        .update({'approval_status': status, 'rejection_reason': ?reason})
+        .eq('id', id);
     setState(() => _future = _fetch(_filters[_tabController.index]));
   }
 
@@ -60,8 +66,9 @@ class _AdminServicesScreenState extends State<AdminServicesScreen>
           AdminPageHeader(
             title: 'Layanan',
             subtitle: 'Kelola persetujuan layanan teknisi',
-            onRefresh: () =>
-                setState(() => _future = _fetch(_filters[_tabController.index])),
+            onRefresh: () => setState(
+              () => _future = _fetch(_filters[_tabController.index]),
+            ),
           ),
           Container(
             color: Colors.white,
@@ -112,13 +119,16 @@ class _AdminServicesScreenState extends State<AdminServicesScreen>
         content: TextField(
           controller: ctrl,
           decoration: const InputDecoration(
-              labelText: 'Alasan penolakan', border: OutlineInputBorder()),
+            labelText: 'Alasan penolakan',
+            border: OutlineInputBorder(),
+          ),
           maxLines: 3,
         ),
         actions: [
           TextButton(
-              onPressed: () => Navigator.pop(context),
-              child: const Text('Batal')),
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Batal'),
+          ),
           FilledButton(
             onPressed: () {
               Navigator.pop(context);
@@ -149,8 +159,9 @@ class _ServiceCard extends StatelessWidget {
     final status = data['approval_status'] as String? ?? '';
     final badge = _badge(status);
     final category = data['category'] as Map<String, dynamic>?;
-    final techProfile = (data['technician'] as Map<String, dynamic>?)?['profile']
-        as Map<String, dynamic>?;
+    final techProfile =
+        (data['technician'] as Map<String, dynamic>?)?['profile']
+            as Map<String, dynamic>?;
     final price = (data['estimated_price'] as num?)?.toDouble() ?? 0;
 
     return Container(
@@ -160,9 +171,10 @@ class _ServiceCard extends StatelessWidget {
         borderRadius: BorderRadius.circular(14),
         boxShadow: [
           BoxShadow(
-              color: Colors.black.withValues(alpha: 0.04),
-              blurRadius: 6,
-              offset: const Offset(0, 2))
+            color: Colors.black.withValues(alpha: 0.04),
+            blurRadius: 6,
+            offset: const Offset(0, 2),
+          ),
         ],
       ),
       child: Padding(
@@ -179,48 +191,68 @@ class _ServiceCard extends StatelessWidget {
                     color: AppColors.teal.withValues(alpha: 0.12),
                     borderRadius: BorderRadius.circular(10),
                   ),
-                  child: const Icon(Icons.build_rounded,
-                      color: AppColors.teal, size: 20),
+                  child: const Icon(
+                    Icons.build_rounded,
+                    color: AppColors.teal,
+                    size: 20,
+                  ),
                 ),
                 const SizedBox(width: 12),
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(data['name'] as String? ?? '-',
-                          style: const TextStyle(
-                              fontWeight: FontWeight.bold,
-                              fontSize: 14,
-                              color: AppColors.textPrimary)),
                       Text(
-                          '${category?['name'] ?? '-'} • ${techProfile?['full_name'] ?? '-'}',
-                          style: const TextStyle(
-                              fontSize: 12, color: AppColors.textSecondary)),
+                        data['name'] as String? ?? '-',
+                        style: const TextStyle(
+                          fontWeight: FontWeight.bold,
+                          fontSize: 14,
+                          color: AppColors.textPrimary,
+                        ),
+                      ),
+                      Text(
+                        '${category?['name'] ?? '-'} • ${techProfile?['full_name'] ?? '-'}',
+                        style: const TextStyle(
+                          fontSize: 12,
+                          color: AppColors.textSecondary,
+                        ),
+                      ),
                     ],
                   ),
                 ),
-                _StatusBadge(label: badge.label, color: badge.color, bg: badge.bg),
+                _StatusBadge(
+                  label: badge.label,
+                  color: badge.color,
+                  bg: badge.bg,
+                ),
               ],
             ),
             if ((data['description'] as String?)?.isNotEmpty == true) ...[
               const SizedBox(height: 8),
-              Text(data['description'] as String,
-                  style: const TextStyle(
-                      fontSize: 12, color: AppColors.textSecondary),
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis),
+              Text(
+                data['description'] as String,
+                style: const TextStyle(
+                  fontSize: 12,
+                  color: AppColors.textSecondary,
+                ),
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+              ),
             ],
             const SizedBox(height: 10),
             Row(
               children: [
                 _InfoChip(
-                    icon: Icons.attach_money_rounded,
-                    label: _formatCurrency(price)),
-                if ((data['estimated_duration'] as String?)?.isNotEmpty == true) ...[
+                  icon: Icons.attach_money_rounded,
+                  label: _formatCurrency(price),
+                ),
+                if ((data['estimated_duration'] as String?)?.isNotEmpty ==
+                    true) ...[
                   const SizedBox(width: 8),
                   _InfoChip(
-                      icon: Icons.schedule_rounded,
-                      label: data['estimated_duration'] as String),
+                    icon: Icons.schedule_rounded,
+                    label: data['estimated_duration'] as String,
+                  ),
                 ],
               ],
             ),
@@ -234,8 +266,9 @@ class _ServiceCard extends StatelessWidget {
                       icon: const Icon(Icons.close_rounded, size: 16),
                       label: const Text('Tolak'),
                       style: OutlinedButton.styleFrom(
-                          foregroundColor: AppColors.error,
-                          side: const BorderSide(color: AppColors.error)),
+                        foregroundColor: AppColors.error,
+                        side: const BorderSide(color: AppColors.error),
+                      ),
                     ),
                   ),
                   const SizedBox(width: 10),
@@ -244,8 +277,9 @@ class _ServiceCard extends StatelessWidget {
                       onPressed: onApprove,
                       icon: const Icon(Icons.check_rounded, size: 16),
                       label: const Text('Setujui'),
-                      style:
-                          FilledButton.styleFrom(backgroundColor: AppColors.success),
+                      style: FilledButton.styleFrom(
+                        backgroundColor: AppColors.success,
+                      ),
                     ),
                   ),
                 ],
@@ -258,17 +292,30 @@ class _ServiceCard extends StatelessWidget {
   }
 
   _BadgeStyle _badge(String status) => switch (status) {
-        'pending' => _BadgeStyle(
-            'Pending', AppColors.warning, AppColors.warning.withValues(alpha: 0.12)),
-        'approved' => _BadgeStyle(
-            'Approved', AppColors.success, AppColors.success.withValues(alpha: 0.12)),
-        'rejected' => _BadgeStyle(
-            'Rejected', AppColors.error, AppColors.error.withValues(alpha: 0.12)),
-        _ => _BadgeStyle('Unknown', AppColors.textSecondary,
-            AppColors.textSecondary.withValues(alpha: 0.1)),
-      };
+    'pending' => _BadgeStyle(
+      'Pending',
+      AppColors.warning,
+      AppColors.warning.withValues(alpha: 0.12),
+    ),
+    'approved' => _BadgeStyle(
+      'Approved',
+      AppColors.success,
+      AppColors.success.withValues(alpha: 0.12),
+    ),
+    'rejected' => _BadgeStyle(
+      'Rejected',
+      AppColors.error,
+      AppColors.error.withValues(alpha: 0.12),
+    ),
+    _ => _BadgeStyle(
+      'Unknown',
+      AppColors.textSecondary,
+      AppColors.textSecondary.withValues(alpha: 0.1),
+    ),
+  };
 
-  static String _formatCurrency(double amount) => 'Rp ${amount.toStringAsFixed(0).replaceAllMapped(RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'), (m) => '${m[1]}.')}';
+  static String _formatCurrency(double amount) =>
+      'Rp ${amount.toStringAsFixed(0).replaceAllMapped(RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'), (m) => '${m[1]}.')}';
 }
 
 class _BadgeStyle {
@@ -279,8 +326,11 @@ class _BadgeStyle {
 }
 
 class _StatusBadge extends StatelessWidget {
-  const _StatusBadge(
-      {required this.label, required this.color, required this.bg});
+  const _StatusBadge({
+    required this.label,
+    required this.color,
+    required this.bg,
+  });
   final String label;
   final Color color;
   final Color bg;
@@ -289,11 +339,18 @@ class _StatusBadge extends StatelessWidget {
   Widget build(BuildContext context) {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-      decoration:
-          BoxDecoration(color: bg, borderRadius: BorderRadius.circular(20)),
-      child: Text(label,
-          style: TextStyle(
-              fontSize: 11, color: color, fontWeight: FontWeight.w600)),
+      decoration: BoxDecoration(
+        color: bg,
+        borderRadius: BorderRadius.circular(20),
+      ),
+      child: Text(
+        label,
+        style: TextStyle(
+          fontSize: 11,
+          color: color,
+          fontWeight: FontWeight.w600,
+        ),
+      ),
     );
   }
 }
@@ -308,14 +365,21 @@ class _InfoChip extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
       decoration: BoxDecoration(
-          color: AppColors.background, borderRadius: BorderRadius.circular(8)),
+        color: AppColors.background,
+        borderRadius: BorderRadius.circular(8),
+      ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
           Icon(icon, size: 13, color: AppColors.textSecondary),
           const SizedBox(width: 4),
-          Text(label,
-              style: const TextStyle(fontSize: 12, color: AppColors.textSecondary)),
+          Text(
+            label,
+            style: const TextStyle(
+              fontSize: 12,
+              color: AppColors.textSecondary,
+            ),
+          ),
         ],
       ),
     );

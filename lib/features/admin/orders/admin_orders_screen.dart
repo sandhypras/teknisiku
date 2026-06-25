@@ -34,10 +34,16 @@ class _AdminOrdersScreenState extends State<AdminOrdersScreen> {
   }
 
   Future<List<Map<String, dynamic>>> _fetch(String? status) async {
-    final q = Supabase.instance.client.from('orders').select(
-        'id, order_number, status, schedule_date, schedule_time, final_total, commission_amount, technician_income, created_at, customer:profiles!customer_id(full_name, phone), technician:technician_profiles!technician_id(profile:profiles!user_id(full_name))');
+    final q = Supabase.instance.client
+        .from('orders')
+        .select(
+          'id, order_number, status, schedule_date, schedule_time, final_total, commission_amount, technician_income, created_at, customer:profiles!customer_id(full_name, phone), technician:technician_profiles!technician_id(profile:profiles!user_id(full_name))',
+        );
     final data = status != null
-        ? await q.eq('status', status).order('created_at', ascending: false).limit(50)
+        ? await q
+              .eq('status', status)
+              .order('created_at', ascending: false)
+              .limit(50)
         : await q.order('created_at', ascending: false).limit(50);
     return List<Map<String, dynamic>>.from(data);
   }
@@ -52,8 +58,7 @@ class _AdminOrdersScreenState extends State<AdminOrdersScreen> {
           AdminPageHeader(
             title: 'Pesanan',
             subtitle: 'Pantau semua pesanan',
-            onRefresh: () =>
-                setState(() => _future = _fetch(_selectedStatus)),
+            onRefresh: () => setState(() => _future = _fetch(_selectedStatus)),
           ),
           _FilterBar(
             options: _statusOptions,
@@ -108,7 +113,7 @@ class _FilterBar extends StatelessWidget {
         scrollDirection: Axis.horizontal,
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
         itemCount: options.length,
-        separatorBuilder: (_, __) => const SizedBox(width: 8),
+        separatorBuilder: (_, _) => const SizedBox(width: 8),
         itemBuilder: (_, i) {
           final (label, value) = options[i];
           final isSelected = selected == value;
@@ -121,15 +126,16 @@ class _FilterBar extends StatelessWidget {
                 borderRadius: BorderRadius.circular(20),
               ),
               child: Center(
-                child: Text(label,
-                    style: TextStyle(
-                      fontSize: 12,
-                      color:
-                          isSelected ? Colors.white : AppColors.textSecondary,
-                      fontWeight: isSelected
-                          ? FontWeight.w600
-                          : FontWeight.normal,
-                    )),
+                child: Text(
+                  label,
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: isSelected ? Colors.white : AppColors.textSecondary,
+                    fontWeight: isSelected
+                        ? FontWeight.w600
+                        : FontWeight.normal,
+                  ),
+                ),
               ),
             ),
           );
@@ -162,9 +168,10 @@ class _OrderCard extends StatelessWidget {
         borderRadius: BorderRadius.circular(14),
         boxShadow: [
           BoxShadow(
-              color: Colors.black.withValues(alpha: 0.04),
-              blurRadius: 6,
-              offset: const Offset(0, 2))
+            color: Colors.black.withValues(alpha: 0.04),
+            blurRadius: 6,
+            offset: const Offset(0, 2),
+          ),
         ],
       ),
       child: Padding(
@@ -175,23 +182,32 @@ class _OrderCard extends StatelessWidget {
             Row(
               children: [
                 Expanded(
-                  child: Text(data['order_number'] as String? ?? '-',
-                      style: const TextStyle(
-                          fontWeight: FontWeight.bold,
-                          fontSize: 14,
-                          color: AppColors.textPrimary)),
+                  child: Text(
+                    data['order_number'] as String? ?? '-',
+                    style: const TextStyle(
+                      fontWeight: FontWeight.bold,
+                      fontSize: 14,
+                      color: AppColors.textPrimary,
+                    ),
+                  ),
                 ),
                 Container(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 10,
+                    vertical: 4,
+                  ),
                   decoration: BoxDecoration(
-                      color: badge.bg,
-                      borderRadius: BorderRadius.circular(20)),
-                  child: Text(badge.label,
-                      style: TextStyle(
-                          fontSize: 11,
-                          color: badge.color,
-                          fontWeight: FontWeight.w600)),
+                    color: badge.bg,
+                    borderRadius: BorderRadius.circular(20),
+                  ),
+                  child: Text(
+                    badge.label,
+                    style: TextStyle(
+                      fontSize: 11,
+                      color: badge.color,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
                 ),
               ],
             ),
@@ -199,35 +215,38 @@ class _OrderCard extends StatelessWidget {
             Row(
               children: [
                 Expanded(
-                    child: _InfoRow(
-                        icon: Icons.person_rounded,
-                        text: 'Customer: ${customer?['full_name'] ?? '-'}')),
+                  child: _InfoRow(
+                    icon: Icons.person_rounded,
+                    text: 'Customer: ${customer?['full_name'] ?? '-'}',
+                  ),
+                ),
                 Expanded(
-                    child: _InfoRow(
-                        icon: Icons.engineering_rounded,
-                        text:
-                            'Teknisi: ${techProfile?['full_name'] ?? '-'}')),
+                  child: _InfoRow(
+                    icon: Icons.engineering_rounded,
+                    text: 'Teknisi: ${techProfile?['full_name'] ?? '-'}',
+                  ),
+                ),
               ],
             ),
             const SizedBox(height: 6),
             _InfoRow(
-                icon: Icons.calendar_today_rounded,
-                text:
-                    'Jadwal: ${data['schedule_date'] ?? '-'} ${data['schedule_time'] ?? ''}'),
+              icon: Icons.calendar_today_rounded,
+              text:
+                  'Jadwal: ${data['schedule_date'] ?? '-'} ${data['schedule_time'] ?? ''}',
+            ),
             if (finalTotal > 0 && commission > 0) ...[
               const SizedBox(height: 8),
               Container(
                 padding: const EdgeInsets.all(10),
                 decoration: BoxDecoration(
-                    color: AppColors.background,
-                    borderRadius: BorderRadius.circular(8)),
+                  color: AppColors.background,
+                  borderRadius: BorderRadius.circular(8),
+                ),
                 child: Row(
                   children: [
-                    Expanded(
-                        child: _MiniStat('Total', _fmt(finalTotal))),
+                    Expanded(child: _MiniStat('Total', _fmt(finalTotal))),
                     Expanded(child: _MiniStat('Komisi', _fmt(commission))),
-                    Expanded(
-                        child: _MiniStat('Teknisi', _fmt(techIncome))),
+                    Expanded(child: _MiniStat('Teknisi', _fmt(techIncome))),
                   ],
                 ),
               ),
@@ -239,27 +258,57 @@ class _OrderCard extends StatelessWidget {
   }
 
   _BadgeStyle _badge(String status) => switch (status) {
-        'waiting_confirmation' => _BadgeStyle(
-            'Menunggu', AppColors.warning, AppColors.warning.withValues(alpha: 0.1)),
-        'accepted' => _BadgeStyle(
-            'Diterima', AppColors.teal, AppColors.teal.withValues(alpha: 0.1)),
-        'on_the_way' => _BadgeStyle(
-            'Di Jalan', AppColors.teal, AppColors.teal.withValues(alpha: 0.1)),
-        'inspection' => _BadgeStyle('Inspeksi', const Color(0xFF8B5CF6),
-            const Color(0xFF8B5CF6).withValues(alpha: 0.1)),
-        'waiting_price_approval' => _BadgeStyle('Tunggu Biaya', AppColors.warning,
-            AppColors.warning.withValues(alpha: 0.1)),
-        'in_progress' => _BadgeStyle('Dikerjakan', AppColors.primary,
-            AppColors.primary.withValues(alpha: 0.1)),
-        'waiting_payment' => _BadgeStyle(
-            'Tunggu Bayar', AppColors.amber, AppColors.amber.withValues(alpha: 0.15)),
-        'completed' => _BadgeStyle(
-            'Selesai', AppColors.success, AppColors.success.withValues(alpha: 0.1)),
-        'rejected' || 'price_rejected' => _BadgeStyle(
-            'Ditolak', AppColors.error, AppColors.error.withValues(alpha: 0.1)),
-        _ => _BadgeStyle('Unknown', AppColors.textSecondary,
-            AppColors.textSecondary.withValues(alpha: 0.1)),
-      };
+    'waiting_confirmation' => _BadgeStyle(
+      'Menunggu',
+      AppColors.warning,
+      AppColors.warning.withValues(alpha: 0.1),
+    ),
+    'accepted' => _BadgeStyle(
+      'Diterima',
+      AppColors.teal,
+      AppColors.teal.withValues(alpha: 0.1),
+    ),
+    'on_the_way' => _BadgeStyle(
+      'Di Jalan',
+      AppColors.teal,
+      AppColors.teal.withValues(alpha: 0.1),
+    ),
+    'inspection' => _BadgeStyle(
+      'Inspeksi',
+      const Color(0xFF8B5CF6),
+      const Color(0xFF8B5CF6).withValues(alpha: 0.1),
+    ),
+    'waiting_price_approval' => _BadgeStyle(
+      'Tunggu Biaya',
+      AppColors.warning,
+      AppColors.warning.withValues(alpha: 0.1),
+    ),
+    'in_progress' => _BadgeStyle(
+      'Dikerjakan',
+      AppColors.primary,
+      AppColors.primary.withValues(alpha: 0.1),
+    ),
+    'waiting_payment' => _BadgeStyle(
+      'Tunggu Bayar',
+      AppColors.amber,
+      AppColors.amber.withValues(alpha: 0.15),
+    ),
+    'completed' => _BadgeStyle(
+      'Selesai',
+      AppColors.success,
+      AppColors.success.withValues(alpha: 0.1),
+    ),
+    'rejected' || 'price_rejected' => _BadgeStyle(
+      'Ditolak',
+      AppColors.error,
+      AppColors.error.withValues(alpha: 0.1),
+    ),
+    _ => _BadgeStyle(
+      'Unknown',
+      AppColors.textSecondary,
+      AppColors.textSecondary.withValues(alpha: 0.1),
+    ),
+  };
 
   static String _fmt(double v) => v == 0
       ? '-'
@@ -285,10 +334,15 @@ class _InfoRow extends StatelessWidget {
         Icon(icon, size: 13, color: AppColors.textSecondary),
         const SizedBox(width: 4),
         Expanded(
-            child: Text(text,
-                style: const TextStyle(
-                    fontSize: 12, color: AppColors.textSecondary),
-                overflow: TextOverflow.ellipsis)),
+          child: Text(
+            text,
+            style: const TextStyle(
+              fontSize: 12,
+              color: AppColors.textSecondary,
+            ),
+            overflow: TextOverflow.ellipsis,
+          ),
+        ),
       ],
     );
   }
@@ -304,14 +358,18 @@ class _MiniStat extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(label,
-            style: const TextStyle(
-                fontSize: 10, color: AppColors.textSecondary)),
-        Text(value,
-            style: const TextStyle(
-                fontSize: 12,
-                fontWeight: FontWeight.w600,
-                color: AppColors.textPrimary)),
+        Text(
+          label,
+          style: const TextStyle(fontSize: 10, color: AppColors.textSecondary),
+        ),
+        Text(
+          value,
+          style: const TextStyle(
+            fontSize: 12,
+            fontWeight: FontWeight.w600,
+            color: AppColors.textPrimary,
+          ),
+        ),
       ],
     );
   }

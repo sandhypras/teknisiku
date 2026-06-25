@@ -7,8 +7,7 @@ class AdminTechniciansScreen extends StatefulWidget {
   const AdminTechniciansScreen({super.key});
 
   @override
-  State<AdminTechniciansScreen> createState() =>
-      _AdminTechniciansScreenState();
+  State<AdminTechniciansScreen> createState() => _AdminTechniciansScreenState();
 }
 
 class _AdminTechniciansScreenState extends State<AdminTechniciansScreen>
@@ -24,7 +23,8 @@ class _AdminTechniciansScreenState extends State<AdminTechniciansScreen>
     super.initState();
     _tabController = TabController(length: _tabs.length, vsync: this);
     _tabController.addListener(
-        () => setState(() => _future = _fetch(_filters[_tabController.index])));
+      () => setState(() => _future = _fetch(_filters[_tabController.index])),
+    );
     _future = _fetch(null);
   }
 
@@ -35,20 +35,29 @@ class _AdminTechniciansScreenState extends State<AdminTechniciansScreen>
   }
 
   Future<List<Map<String, dynamic>>> _fetch(String? status) async {
-    final q = Supabase.instance.client.from('technician_profiles').select(
-        'id, verification_status, verified_at, rejection_reason, skills, service_area, created_at, profile:profiles!user_id(full_name, email, phone)');
+    final q = Supabase.instance.client
+        .from('technician_profiles')
+        .select(
+          'id, verification_status, verified_at, rejection_reason, skills, service_area, created_at, profile:profiles!user_id(full_name, email, phone)',
+        );
     final data = status != null
-        ? await q.eq('verification_status', status).order('created_at', ascending: false)
+        ? await q
+              .eq('verification_status', status)
+              .order('created_at', ascending: false)
         : await q.order('created_at', ascending: false);
     return List<Map<String, dynamic>>.from(data);
   }
 
   Future<void> _updateStatus(String id, String status, {String? reason}) async {
-    await Supabase.instance.client.from('technician_profiles').update({
-      'verification_status': status,
-        if (status == 'verified') 'verified_at': DateTime.now().toIso8601String(),
-      if (reason != null) 'rejection_reason': reason,
-    }).eq('id', id);
+    await Supabase.instance.client
+        .from('technician_profiles')
+        .update({
+          'verification_status': status,
+          if (status == 'verified')
+            'verified_at': DateTime.now().toIso8601String(),
+          'rejection_reason': ?reason,
+        })
+        .eq('id', id);
     setState(() => _future = _fetch(_filters[_tabController.index]));
   }
 
@@ -62,8 +71,9 @@ class _AdminTechniciansScreenState extends State<AdminTechniciansScreen>
           AdminPageHeader(
             title: 'Teknisi',
             subtitle: 'Kelola dan verifikasi teknisi',
-            onRefresh: () =>
-                setState(() => _future = _fetch(_filters[_tabController.index])),
+            onRefresh: () => setState(
+              () => _future = _fetch(_filters[_tabController.index]),
+            ),
           ),
           Container(
             color: Colors.white,
@@ -116,13 +126,16 @@ class _AdminTechniciansScreenState extends State<AdminTechniciansScreen>
         content: TextField(
           controller: ctrl,
           decoration: const InputDecoration(
-              labelText: 'Alasan penolakan', border: OutlineInputBorder()),
+            labelText: 'Alasan penolakan',
+            border: OutlineInputBorder(),
+          ),
           maxLines: 3,
         ),
         actions: [
           TextButton(
-              onPressed: () => Navigator.pop(context),
-              child: const Text('Batal')),
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Batal'),
+          ),
           FilledButton(
             onPressed: () {
               Navigator.pop(context);
@@ -164,9 +177,10 @@ class _TechnicianCard extends StatelessWidget {
         borderRadius: BorderRadius.circular(14),
         boxShadow: [
           BoxShadow(
-              color: Colors.black.withValues(alpha: 0.04),
-              blurRadius: 6,
-              offset: const Offset(0, 2))
+            color: Colors.black.withValues(alpha: 0.04),
+            blurRadius: 6,
+            offset: const Offset(0, 2),
+          ),
         ],
       ),
       child: Padding(
@@ -182,9 +196,10 @@ class _TechnicianCard extends StatelessWidget {
                   child: Text(
                     (profile?['full_name'] as String? ?? 'T')[0].toUpperCase(),
                     style: const TextStyle(
-                        color: AppColors.teal,
-                        fontWeight: FontWeight.bold,
-                        fontSize: 18),
+                      color: AppColors.teal,
+                      fontWeight: FontWeight.bold,
+                      fontSize: 18,
+                    ),
                   ),
                 ),
                 const SizedBox(width: 12),
@@ -192,18 +207,29 @@ class _TechnicianCard extends StatelessWidget {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(profile?['full_name'] as String? ?? '-',
-                          style: const TextStyle(
-                              fontWeight: FontWeight.bold,
-                              fontSize: 15,
-                              color: AppColors.textPrimary)),
-                      Text(profile?['email'] as String? ?? '-',
-                          style: const TextStyle(
-                              fontSize: 12, color: AppColors.textSecondary)),
+                      Text(
+                        profile?['full_name'] as String? ?? '-',
+                        style: const TextStyle(
+                          fontWeight: FontWeight.bold,
+                          fontSize: 15,
+                          color: AppColors.textPrimary,
+                        ),
+                      ),
+                      Text(
+                        profile?['email'] as String? ?? '-',
+                        style: const TextStyle(
+                          fontSize: 12,
+                          color: AppColors.textSecondary,
+                        ),
+                      ),
                     ],
                   ),
                 ),
-                _StatusBadge(label: badge.label, color: badge.color, bg: badge.bg),
+                _StatusBadge(
+                  label: badge.label,
+                  color: badge.color,
+                  bg: badge.bg,
+                ),
               ],
             ),
             if (skills.isNotEmpty) ...[
@@ -212,12 +238,16 @@ class _TechnicianCard extends StatelessWidget {
                 spacing: 6,
                 children: skills
                     .take(4)
-                    .map((s) => Chip(
-                          label: Text(s, style: const TextStyle(fontSize: 11)),
-                          padding: EdgeInsets.zero,
-                          materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                          backgroundColor: AppColors.primary.withValues(alpha: 0.08),
-                        ))
+                    .map(
+                      (s) => Chip(
+                        label: Text(s, style: const TextStyle(fontSize: 11)),
+                        padding: EdgeInsets.zero,
+                        materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                        backgroundColor: AppColors.primary.withValues(
+                          alpha: 0.08,
+                        ),
+                      ),
+                    )
                     .toList(),
               ),
             ],
@@ -231,13 +261,21 @@ class _TechnicianCard extends StatelessWidget {
                 ),
                 child: Row(
                   children: [
-                    const Icon(Icons.info_outline_rounded,
-                        size: 14, color: AppColors.error),
+                    const Icon(
+                      Icons.info_outline_rounded,
+                      size: 14,
+                      color: AppColors.error,
+                    ),
                     const SizedBox(width: 6),
                     Expanded(
-                        child: Text(data['rejection_reason'] as String,
-                            style: const TextStyle(
-                                fontSize: 12, color: AppColors.error))),
+                      child: Text(
+                        data['rejection_reason'] as String,
+                        style: const TextStyle(
+                          fontSize: 12,
+                          color: AppColors.error,
+                        ),
+                      ),
+                    ),
                   ],
                 ),
               ),
@@ -252,8 +290,9 @@ class _TechnicianCard extends StatelessWidget {
                       icon: const Icon(Icons.close_rounded, size: 16),
                       label: const Text('Tolak'),
                       style: OutlinedButton.styleFrom(
-                          foregroundColor: AppColors.error,
-                          side: const BorderSide(color: AppColors.error)),
+                        foregroundColor: AppColors.error,
+                        side: const BorderSide(color: AppColors.error),
+                      ),
                     ),
                   ),
                   const SizedBox(width: 10),
@@ -262,8 +301,9 @@ class _TechnicianCard extends StatelessWidget {
                       onPressed: onVerify,
                       icon: const Icon(Icons.check_rounded, size: 16),
                       label: const Text('Verifikasi'),
-                      style:
-                          FilledButton.styleFrom(backgroundColor: AppColors.success),
+                      style: FilledButton.styleFrom(
+                        backgroundColor: AppColors.success,
+                      ),
                     ),
                   ),
                 ],
@@ -277,7 +317,8 @@ class _TechnicianCard extends StatelessWidget {
                   icon: const Icon(Icons.block_rounded, size: 16),
                   label: const Text('Nonaktifkan'),
                   style: OutlinedButton.styleFrom(
-                      foregroundColor: AppColors.textSecondary),
+                    foregroundColor: AppColors.textSecondary,
+                  ),
                 ),
               ),
             ],
@@ -288,17 +329,32 @@ class _TechnicianCard extends StatelessWidget {
   }
 
   _BadgeStyle _badge(String status) => switch (status) {
-        'pending' => _BadgeStyle(
-            'Pending', AppColors.warning, AppColors.warning.withValues(alpha: 0.12)),
-        'verified' => _BadgeStyle(
-            'Verified', AppColors.success, AppColors.success.withValues(alpha: 0.12)),
-        'rejected' => _BadgeStyle(
-            'Rejected', AppColors.error, AppColors.error.withValues(alpha: 0.12)),
-        'inactive' => _BadgeStyle('Inactive', AppColors.textSecondary,
-            AppColors.textSecondary.withValues(alpha: 0.12)),
-        _ => _BadgeStyle('Unknown', AppColors.textSecondary,
-            AppColors.textSecondary.withValues(alpha: 0.1)),
-      };
+    'pending' => _BadgeStyle(
+      'Pending',
+      AppColors.warning,
+      AppColors.warning.withValues(alpha: 0.12),
+    ),
+    'verified' => _BadgeStyle(
+      'Verified',
+      AppColors.success,
+      AppColors.success.withValues(alpha: 0.12),
+    ),
+    'rejected' => _BadgeStyle(
+      'Rejected',
+      AppColors.error,
+      AppColors.error.withValues(alpha: 0.12),
+    ),
+    'inactive' => _BadgeStyle(
+      'Inactive',
+      AppColors.textSecondary,
+      AppColors.textSecondary.withValues(alpha: 0.12),
+    ),
+    _ => _BadgeStyle(
+      'Unknown',
+      AppColors.textSecondary,
+      AppColors.textSecondary.withValues(alpha: 0.1),
+    ),
+  };
 }
 
 class _BadgeStyle {
@@ -309,8 +365,11 @@ class _BadgeStyle {
 }
 
 class _StatusBadge extends StatelessWidget {
-  const _StatusBadge(
-      {required this.label, required this.color, required this.bg});
+  const _StatusBadge({
+    required this.label,
+    required this.color,
+    required this.bg,
+  });
   final String label;
   final Color color;
   final Color bg;
@@ -319,11 +378,18 @@ class _StatusBadge extends StatelessWidget {
   Widget build(BuildContext context) {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-      decoration:
-          BoxDecoration(color: bg, borderRadius: BorderRadius.circular(20)),
-      child: Text(label,
-          style: TextStyle(
-              fontSize: 11, color: color, fontWeight: FontWeight.w600)),
+      decoration: BoxDecoration(
+        color: bg,
+        borderRadius: BorderRadius.circular(20),
+      ),
+      child: Text(
+        label,
+        style: TextStyle(
+          fontSize: 11,
+          color: color,
+          fontWeight: FontWeight.w600,
+        ),
+      ),
     );
   }
 }
