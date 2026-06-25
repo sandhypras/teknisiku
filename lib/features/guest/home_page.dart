@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../app/theme.dart';
+import '../auth/login_page.dart';
 
 class GuestHomePage extends StatelessWidget {
   const GuestHomePage({super.key});
@@ -25,7 +26,16 @@ class GuestHomePage extends StatelessWidget {
     return Scaffold(
       appBar: AppBar(
         title: const Text('Si Teknisi'),
-        actions: [TextButton(onPressed: () {}, child: const Text('Masuk'))],
+        actions: [
+          TextButton(
+            onPressed: () {
+              Navigator.of(
+                context,
+              ).push(MaterialPageRoute(builder: (_) => const LoginPage()));
+            },
+            child: const Text('Masuk'),
+          ),
+        ],
       ),
       body: SafeArea(
         child: ListView(
