@@ -1,26 +1,31 @@
 import 'package:flutter/material.dart';
 
 import '../../app/theme.dart';
-import 'register_customer_page.dart';
 
-class LoginPage extends StatefulWidget {
-  const LoginPage({super.key});
+class RegisterCustomerPage extends StatefulWidget {
+  const RegisterCustomerPage({super.key});
 
   @override
-  State<LoginPage> createState() => _LoginPageState();
+  State<RegisterCustomerPage> createState() => _RegisterCustomerPageState();
 }
 
-class _LoginPageState extends State<LoginPage> {
+class _RegisterCustomerPageState extends State<RegisterCustomerPage> {
   final _formKey = GlobalKey<FormState>();
+  final _nameController = TextEditingController();
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
+  final _phoneController = TextEditingController();
+  final _addressController = TextEditingController();
 
   bool _obscurePassword = true;
 
   @override
   void dispose() {
+    _nameController.dispose();
     _emailController.dispose();
     _passwordController.dispose();
+    _phoneController.dispose();
+    _addressController.dispose();
     super.dispose();
   }
 
@@ -31,7 +36,9 @@ class _LoginPageState extends State<LoginPage> {
 
     ScaffoldMessenger.of(context).showSnackBar(
       const SnackBar(
-        content: Text('Integrasi login Supabase akan ditambahkan berikutnya.'),
+        content: Text(
+          'Integrasi register customer Supabase akan ditambahkan berikutnya.',
+        ),
       ),
     );
   }
@@ -39,14 +46,13 @@ class _LoginPageState extends State<LoginPage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(),
+      appBar: AppBar(title: const Text('Daftar Customer')),
       body: SafeArea(
         child: ListView(
           padding: const EdgeInsets.all(20),
           children: [
-            const SizedBox(height: 24),
             const Text(
-              'Masuk ke Si Teknisi',
+              'Buat akun customer',
               style: TextStyle(
                 color: AppColors.textPrimary,
                 fontSize: 28,
@@ -55,7 +61,7 @@ class _LoginPageState extends State<LoginPage> {
             ),
             const SizedBox(height: 8),
             const Text(
-              'Gunakan email dan password untuk melanjutkan sebagai customer, teknisi, atau admin.',
+              'Lengkapi data agar bisa memesan layanan teknisi di wilayah Solo.',
               style: TextStyle(color: AppColors.textSecondary, height: 1.4),
             ),
             const SizedBox(height: 28),
@@ -63,6 +69,22 @@ class _LoginPageState extends State<LoginPage> {
               key: _formKey,
               child: Column(
                 children: [
+                  TextFormField(
+                    controller: _nameController,
+                    textInputAction: TextInputAction.next,
+                    decoration: const InputDecoration(
+                      labelText: 'Nama lengkap',
+                      prefixIcon: Icon(Icons.person_outline),
+                    ),
+                    validator: (value) {
+                      if ((value ?? '').trim().isEmpty) {
+                        return 'Nama lengkap wajib diisi';
+                      }
+
+                      return null;
+                    },
+                  ),
+                  const SizedBox(height: 14),
                   TextFormField(
                     controller: _emailController,
                     keyboardType: TextInputType.emailAddress,
@@ -89,7 +111,7 @@ class _LoginPageState extends State<LoginPage> {
                   TextFormField(
                     controller: _passwordController,
                     obscureText: _obscurePassword,
-                    textInputAction: TextInputAction.done,
+                    textInputAction: TextInputAction.next,
                     decoration: InputDecoration(
                       labelText: 'Password',
                       prefixIcon: const Icon(Icons.lock_outline),
@@ -117,6 +139,42 @@ class _LoginPageState extends State<LoginPage> {
 
                       return null;
                     },
+                  ),
+                  const SizedBox(height: 14),
+                  TextFormField(
+                    controller: _phoneController,
+                    keyboardType: TextInputType.phone,
+                    textInputAction: TextInputAction.next,
+                    decoration: const InputDecoration(
+                      labelText: 'Nomor telepon',
+                      prefixIcon: Icon(Icons.phone_outlined),
+                    ),
+                    validator: (value) {
+                      if ((value ?? '').trim().isEmpty) {
+                        return 'Nomor telepon wajib diisi';
+                      }
+
+                      return null;
+                    },
+                  ),
+                  const SizedBox(height: 14),
+                  TextFormField(
+                    controller: _addressController,
+                    minLines: 3,
+                    maxLines: 4,
+                    textInputAction: TextInputAction.done,
+                    decoration: const InputDecoration(
+                      labelText: 'Alamat',
+                      alignLabelWithHint: true,
+                      prefixIcon: Icon(Icons.location_on_outlined),
+                    ),
+                    validator: (value) {
+                      if ((value ?? '').trim().isEmpty) {
+                        return 'Alamat wajib diisi';
+                      }
+
+                      return null;
+                    },
                     onFieldSubmitted: (_) => _submit(),
                   ),
                   const SizedBox(height: 20),
@@ -124,28 +182,11 @@ class _LoginPageState extends State<LoginPage> {
                     width: double.infinity,
                     child: FilledButton(
                       onPressed: _submit,
-                      child: const Text('Masuk'),
+                      child: const Text('Daftar'),
                     ),
                   ),
                 ],
               ),
-            ),
-            const SizedBox(height: 20),
-            const Divider(),
-            const SizedBox(height: 12),
-            TextButton(
-              onPressed: () {
-                Navigator.of(context).push(
-                  MaterialPageRoute(
-                    builder: (_) => const RegisterCustomerPage(),
-                  ),
-                );
-              },
-              child: const Text('Daftar sebagai customer'),
-            ),
-            TextButton(
-              onPressed: () {},
-              child: const Text('Daftar sebagai teknisi'),
             ),
           ],
         ),
