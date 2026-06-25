@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../core/models/app_user_profile.dart';
 import '../../core/services/auth_service.dart';
+import '../admin/admin_shell.dart';
 
 class RoleHomeScreen extends StatelessWidget {
   const RoleHomeScreen({
@@ -15,6 +16,10 @@ class RoleHomeScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    if (profile.role == AppRole.admin) {
+      return AdminShell(profile: profile, authService: authService);
+    }
+
     final title = switch (profile.role) {
       AppRole.customer => 'Home Customer',
       AppRole.technician => 'Dashboard Teknisi',
