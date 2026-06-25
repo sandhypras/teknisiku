@@ -12,18 +12,25 @@ Project ini dibuat sebagai project kuliah menggunakan Flutter Android, Flutter W
 
 ## Struktur Repository
 
+Project Flutter saat ini berada di root repository.
+
 ```text
-si-teknisi/
-├── mobile_app/
-├── admin_web/
-├── supabase/
-│   ├── migrations/
-│   ├── policies/
-│   └── seed.sql
-├── documentation/
-│   └── PRD.md
-└── README.md
+teknisiku/
+|-- android/
+|-- lib/
+|-- web/
+|-- windows/
+|-- supabase/
+|   |-- migrations/
+|   |-- policies/
+|   `-- seed.sql
+|-- documentation/
+|   `-- PRD.md
+|-- pubspec.yaml
+`-- README.md
 ```
+
+Folder `mobile_app/` dan `admin_web/` disiapkan sebagai placeholder apabila project mobile dan admin web ingin dipisah sesuai rencana PRD.
 
 ## Role
 
@@ -52,12 +59,23 @@ Detail lengkap kebutuhan produk tersedia di [documentation/PRD.md](documentation
 
 ## Setup Pengembangan
 
-Instruksi teknis akan dilengkapi setelah project Flutter dan Supabase mulai dibuat.
+Pastikan Flutter SDK sudah terpasang, lalu jalankan:
 
-Rencana awal:
+```bash
+flutter pub get
+flutter run
+```
 
-1. Buat project Flutter di `mobile_app/`.
-2. Buat project Flutter Web admin di `admin_web/`.
-3. Buat schema Supabase di `supabase/migrations/`.
-4. Tambahkan seed data demo di `supabase/seed.sql`.
-5. Isi konfigurasi environment berdasarkan `.env.example`.
+Untuk menjalankan target web:
+
+```bash
+flutter run -d chrome
+```
+
+Konfigurasi environment dapat mengikuti `.env.example`.
+
+## Repository
+
+```text
+https://github.com/sandhypras/teknisiku.git
+```

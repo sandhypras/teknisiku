@@ -62,7 +62,7 @@ Aplikasi terdiri dari:
 - Flutter Web untuk admin
 - Supabase sebagai backend
 
-### 4.2 Jenis layanan
+### 4.2 Jenis Layanan
 
 Kategori layanan awal meliputi:
 
@@ -73,7 +73,7 @@ Kategori layanan awal meliputi:
 - Servis CCTV
 - Instalasi dan perbaikan jaringan
 
-### 4.3 Model pelayanan
+### 4.3 Model Pelayanan
 
 Teknisi datang langsung ke alamat customer.
 
@@ -163,7 +163,7 @@ Admin dapat:
 ## 6. Role dan Hak Akses
 
 | Fitur | Guest | Customer | Teknisi | Admin |
-| --- | ---: | ---: | ---: | ---: |
+| --- | --- | --- | --- | --- |
 | Melihat halaman utama | Ya | Ya | Ya | Tidak |
 | Melihat kategori | Ya | Ya | Ya | Ya |
 | Melihat teknisi | Ya | Ya | Tidak | Ya |
@@ -336,9 +336,7 @@ Customer dapat:
 - Melihat jumlah pekerjaan selesai
 - Melihat layanan yang ditawarkan
 
-Customer memilih teknisi sendiri.
-
-Admin tidak menentukan teknisi untuk pesanan customer.
+Customer memilih teknisi sendiri. Admin tidak menentukan teknisi untuk pesanan customer.
 
 ### 7.8 Profil Teknisi
 
@@ -377,9 +375,7 @@ Data alamat:
 
 Google Maps digunakan untuk memilih titik alamat customer.
 
-Customer tidak dapat melihat lokasi teknisi secara langsung.
-
-Aplikasi tidak menggunakan live tracking.
+Customer tidak dapat melihat lokasi teknisi secara langsung. Aplikasi tidak menggunakan live tracking.
 
 ### 7.10 Pemesanan Layanan
 
@@ -624,86 +620,57 @@ Grafik tidak wajib pada versi MVP.
 
 ## 8. Alur Utama Aplikasi
 
-### 8.1 Alur registrasi teknisi
+### 8.1 Alur Registrasi Teknisi
 
 ```text
 Teknisi membuka aplikasi
-↓
-Memilih daftar sebagai teknisi
-↓
-Mengisi data akun
-↓
-Melengkapi profil dan dokumen
-↓
-Status verifikasi pending
-↓
-Admin memeriksa data
-↓
-Admin menyetujui teknisi
-↓
-Status berubah menjadi verified
+-> Memilih daftar sebagai teknisi
+-> Mengisi data akun
+-> Melengkapi profil dan dokumen
+-> Status verifikasi pending
+-> Admin memeriksa data
+-> Admin menyetujui teknisi
+-> Status berubah menjadi verified
 ```
 
-### 8.2 Alur pembuatan layanan
+### 8.2 Alur Pembuatan Layanan
 
 ```text
 Teknisi login
-↓
-Teknisi memilih Tambah Layanan
-↓
-Mengisi data layanan
-↓
-Status layanan pending
-↓
-Admin memeriksa layanan
-↓
-Admin menyetujui layanan
-↓
-Layanan tampil kepada customer
+-> Teknisi memilih Tambah Layanan
+-> Mengisi data layanan
+-> Status layanan pending
+-> Admin memeriksa layanan
+-> Admin menyetujui layanan
+-> Layanan tampil kepada customer
 ```
 
-### 8.3 Alur pemesanan
+### 8.3 Alur Pemesanan
 
 ```text
 Customer login
-↓
-Memilih kategori
-↓
-Memilih teknisi
-↓
-Memilih layanan
-↓
-Mengisi detail kerusakan
-↓
-Memilih alamat dan jadwal
-↓
-Mengirim pesanan
-↓
-Pesanan masuk ke teknisi
+-> Memilih kategori
+-> Memilih teknisi
+-> Memilih layanan
+-> Mengisi detail kerusakan
+-> Memilih alamat dan jadwal
+-> Mengirim pesanan
+-> Pesanan masuk ke teknisi
 ```
 
-### 8.4 Alur pengerjaan
+### 8.4 Alur Pengerjaan
 
 ```text
 Teknisi menerima pesanan
-↓
-Teknisi menuju lokasi
-↓
-Teknisi melakukan pemeriksaan
-↓
-Teknisi memasukkan diagnosis dan biaya
-↓
-Customer menyetujui biaya
-↓
-Teknisi mulai mengerjakan
-↓
-Teknisi mengunggah foto hasil
-↓
-Pesanan menunggu pembayaran
-↓
-Pembayaran berhasil
-↓
-Pesanan selesai
+-> Teknisi menuju lokasi
+-> Teknisi melakukan pemeriksaan
+-> Teknisi memasukkan diagnosis dan biaya
+-> Customer menyetujui biaya
+-> Teknisi mulai mengerjakan
+-> Teknisi mengunggah foto hasil
+-> Pesanan menunggu pembayaran
+-> Pembayaran berhasil
+-> Pesanan selesai
 ```
 
 ---
@@ -781,7 +748,7 @@ Pesanan selesai
 
 ## 10. Desain Antarmuka
 
-### 10.1 Konsep desain
+### 10.1 Konsep Desain
 
 Desain aplikasi menggunakan gaya:
 
@@ -795,16 +762,16 @@ Desain aplikasi menggunakan gaya:
 
 | Kegunaan | Warna | Kode |
 | --- | --- | --- |
-| Primary | Navy Blue | #16324F |
-| Secondary | Teal | #00A6A6 |
-| Accent | Amber | #F4A261 |
-| Background | Soft Gray | #F6F8FA |
-| Card | White | #FFFFFF |
-| Teks utama | Dark Charcoal | #1F2937 |
-| Teks sekunder | Gray | #6B7280 |
-| Sukses | Green | #22C55E |
-| Peringatan | Orange | #F59E0B |
-| Gagal | Red | #EF4444 |
+| Primary | Navy Blue | `#16324F` |
+| Secondary | Teal | `#00A6A6` |
+| Accent | Amber | `#F4A261` |
+| Background | Soft Gray | `#F6F8FA` |
+| Card | White | `#FFFFFF` |
+| Teks utama | Dark Charcoal | `#1F2937` |
+| Teks sekunder | Gray | `#6B7280` |
+| Sukses | Green | `#22C55E` |
+| Peringatan | Orange | `#F59E0B` |
+| Gagal | Red | `#EF4444` |
 
 ### 10.3 Font
 
@@ -835,7 +802,7 @@ Komponen utama:
 
 ## 11. Arsitektur Teknologi
 
-### 11.1 Mobile dan web
+### 11.1 Mobile dan Web
 
 - Flutter
 - Dart
@@ -854,7 +821,7 @@ Komponen utama:
 - Geolocator
 - Geocoding
 
-### 11.4 State management
+### 11.4 State Management
 
 Pilihan state management:
 
@@ -867,18 +834,18 @@ Untuk project ini disarankan menggunakan Riverpod atau Provider sesuai kemampuan
 
 - GoRouter
 
-### 11.6 Struktur repository
+### 11.6 Struktur Repository
 
 ```text
 si-teknisi/
-├── mobile_app/
-├── admin_web/
-├── supabase/
-│   ├── migrations/
-│   ├── policies/
-│   └── seed.sql
-├── documentation/
-└── README.md
+|-- mobile_app/
+|-- admin_web/
+|-- supabase/
+|   |-- migrations/
+|   |-- policies/
+|   `-- seed.sql
+|-- documentation/
+`-- README.md
 ```
 
 ---
@@ -926,7 +893,7 @@ created_at
 updated_at
 ```
 
-### 12.2 Technician profiles
+### 12.2 Technician Profiles
 
 Kolom:
 
@@ -999,7 +966,7 @@ created_at
 updated_at
 ```
 
-### 12.6 Order items
+### 12.6 Order Items
 
 Kolom:
 
@@ -1106,7 +1073,7 @@ created_at
 
 Karena aplikasi ditargetkan memiliki versi demo dalam satu hari, fitur MVP diprioritaskan sebagai berikut:
 
-### Fitur wajib
+### Fitur Wajib
 
 - Login dan register
 - Role customer, teknisi, dan admin
@@ -1142,7 +1109,7 @@ Untuk versi demo:
 
 ## 15. Pembagian Tugas Tim
 
-### Anggota 1 - Supabase dan autentikasi
+### Anggota 1: Supabase dan Autentikasi
 
 Tanggung jawab:
 
@@ -1163,7 +1130,7 @@ Branch:
 backend-supabase
 ```
 
-### Anggota 2 - Guest dan Customer Mobile
+### Anggota 2: Guest dan Customer Mobile
 
 Tanggung jawab:
 
@@ -1185,7 +1152,7 @@ Branch:
 customer-mobile
 ```
 
-### Anggota 3 - Teknisi dan Admin
+### Anggota 3: Teknisi dan Admin
 
 Tanggung jawab teknisi:
 
@@ -1259,7 +1226,7 @@ technician-admin
 
 ## 17. Skenario Pengujian Utama
 
-### Skenario 1: Registrasi teknisi
+### Skenario 1: Registrasi Teknisi
 
 1. Teknisi melakukan registrasi.
 2. Teknisi melengkapi profil.
@@ -1269,7 +1236,7 @@ technician-admin
 6. Admin menyetujui teknisi.
 7. Status teknisi menjadi verified.
 
-### Skenario 2: Penambahan layanan
+### Skenario 2: Penambahan Layanan
 
 1. Teknisi login.
 2. Teknisi menambahkan layanan.
@@ -1277,7 +1244,7 @@ technician-admin
 4. Admin menyetujui layanan.
 5. Layanan tampil pada aplikasi customer.
 
-### Skenario 3: Pemesanan customer
+### Skenario 3: Pemesanan Customer
 
 1. Customer login.
 2. Customer memilih kategori.
@@ -1288,7 +1255,7 @@ technician-admin
 7. Teknisi menerima pesanan.
 8. Customer melihat perubahan status.
 
-### Skenario 4: Penyelesaian pekerjaan
+### Skenario 4: Penyelesaian Pekerjaan
 
 1. Teknisi mengubah status menjadi inspection.
 2. Teknisi mengisi diagnosis dan biaya.
