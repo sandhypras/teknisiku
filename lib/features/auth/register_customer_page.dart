@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../app/theme.dart';
+import '../../core/services/auth_service.dart';
+import '../../core/services/marketplace_repository.dart';
 
 class RegisterCustomerPage extends StatefulWidget {
   const RegisterCustomerPage({super.key});
@@ -16,8 +19,19 @@ class _RegisterCustomerPageState extends State<RegisterCustomerPage> {
   final _passwordController = TextEditingController();
   final _phoneController = TextEditingController();
   final _addressController = TextEditingController();
-
+  late final AuthService _authService;
+  late final MarketplaceRepository _repo;
   bool _obscurePassword = true;
+  bool _loading = false;
+  String? _error;
+
+  @override
+  void initState() {
+    super.initState();
+    final client = Supabase.instance.client;
+    _authService = AuthService(client);
+    _repo = MarketplaceRepository(client);
+  }
 
   @override
   void dispose() {
@@ -29,160 +43,169 @@ class _RegisterCustomerPageState extends State<RegisterCustomerPage> {
     super.dispose();
   }
 
-  void _submit() {
-    if (!_formKey.currentState!.validate()) {
-      return;
+  Future<void> _submit() async {
+    if (!_formKey.currentState!.validate()) return;
+    setState(() {
+      _loading = true;
+      _error = null;
+    });
+    try {
+      await _authService.registerCustomer(
+        email: _emailController.text.trim(),
+        password: _passwordController.text,
+        fullName: _nameController.text.trim(),
+        phone: _phoneController.text.trim(),
+      );
+      await _repo.addAddress(
+        label: 'Rumah',
+        recipientName: _nameController.text.trim(),
+        phone: _phoneController.text.trim(),
+        fullAddress: _addressController.text.trim(),
+      );
+      if (mounted) Navigator.of(context).popUntil((route) => route.isFirst);
+    } catch (error) {
+      setState(() => _error = error.toString());
+    } finally {
+      if (mounted) setState(() => _loading = false);
     }
-
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text(
-          'Integrasi register customer Supabase akan ditambahkan berikutnya.',
-        ),
-      ),
-    );
   }
 
   @override
   Widget build(BuildContext context) {
+    return _RegisterScaffold(
+      title: 'Buat akun customer',
+      subtitle: 'Simpan alamat awal agar bisa langsung memesan teknisi.',
+      error: _error,
+      loading: _loading,
+      formKey: _formKey,
+      onSubmit: _submit,
+      fields: [
+        _TextFieldConfig(_nameController, 'Nama lengkap', Icons.person_outline),
+        _TextFieldConfig(
+          _emailController,
+          'Email',
+          Icons.email_outlined,
+          keyboard: TextInputType.emailAddress,
+        ),
+        _TextFieldConfig(
+          _passwordController,
+          'Password',
+          Icons.lock_outline,
+          obscure: _obscurePassword,
+          suffix: IconButton(
+            onPressed: () =>
+                setState(() => _obscurePassword = !_obscurePassword),
+            icon: Icon(
+              _obscurePassword
+                  ? Icons.visibility_outlined
+                  : Icons.visibility_off_outlined,
+            ),
+          ),
+        ),
+        _TextFieldConfig(
+          _phoneController,
+          'Nomor telepon',
+          Icons.phone_outlined,
+          keyboard: TextInputType.phone,
+        ),
+        _TextFieldConfig(
+          _addressController,
+          'Alamat lengkap',
+          Icons.location_on_outlined,
+          maxLines: 3,
+        ),
+      ],
+    );
+  }
+}
+
+class _RegisterScaffold extends StatelessWidget {
+  const _RegisterScaffold({
+    required this.title,
+    required this.subtitle,
+    required this.fields,
+    required this.formKey,
+    required this.onSubmit,
+    required this.loading,
+    this.error,
+  });
+
+  final String title;
+  final String subtitle;
+  final List<_TextFieldConfig> fields;
+  final GlobalKey<FormState> formKey;
+  final VoidCallback onSubmit;
+  final bool loading;
+  final String? error;
+
+  @override
+  Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Daftar Customer')),
+      appBar: AppBar(),
       body: SafeArea(
         child: ListView(
           padding: const EdgeInsets.all(20),
           children: [
-            const Text(
-              'Buat akun customer',
-              style: TextStyle(
+            Text(
+              title,
+              style: const TextStyle(
                 color: AppColors.textPrimary,
                 fontSize: 28,
-                fontWeight: FontWeight.w800,
+                fontWeight: FontWeight.w900,
               ),
             ),
             const SizedBox(height: 8),
-            const Text(
-              'Lengkapi data agar bisa memesan layanan teknisi di wilayah Solo.',
-              style: TextStyle(color: AppColors.textSecondary, height: 1.4),
+            Text(
+              subtitle,
+              style: const TextStyle(
+                color: AppColors.textSecondary,
+                height: 1.4,
+              ),
             ),
-            const SizedBox(height: 28),
+            const SizedBox(height: 24),
             Form(
-              key: _formKey,
+              key: formKey,
               child: Column(
                 children: [
-                  TextFormField(
-                    controller: _nameController,
-                    textInputAction: TextInputAction.next,
-                    decoration: const InputDecoration(
-                      labelText: 'Nama lengkap',
-                      prefixIcon: Icon(Icons.person_outline),
-                    ),
-                    validator: (value) {
-                      if ((value ?? '').trim().isEmpty) {
-                        return 'Nama lengkap wajib diisi';
-                      }
-
-                      return null;
-                    },
-                  ),
-                  const SizedBox(height: 14),
-                  TextFormField(
-                    controller: _emailController,
-                    keyboardType: TextInputType.emailAddress,
-                    textInputAction: TextInputAction.next,
-                    decoration: const InputDecoration(
-                      labelText: 'Email',
-                      prefixIcon: Icon(Icons.email_outlined),
-                    ),
-                    validator: (value) {
-                      final email = value?.trim() ?? '';
-
-                      if (email.isEmpty) {
-                        return 'Email wajib diisi';
-                      }
-
-                      if (!email.contains('@')) {
-                        return 'Format email belum sesuai';
-                      }
-
-                      return null;
-                    },
-                  ),
-                  const SizedBox(height: 14),
-                  TextFormField(
-                    controller: _passwordController,
-                    obscureText: _obscurePassword,
-                    textInputAction: TextInputAction.next,
-                    decoration: InputDecoration(
-                      labelText: 'Password',
-                      prefixIcon: const Icon(Icons.lock_outline),
-                      suffixIcon: IconButton(
-                        onPressed: () {
-                          setState(() {
-                            _obscurePassword = !_obscurePassword;
-                          });
-                        },
-                        icon: Icon(
-                          _obscurePassword
-                              ? Icons.visibility_outlined
-                              : Icons.visibility_off_outlined,
-                        ),
+                  for (final field in fields) ...[
+                    TextFormField(
+                      controller: field.controller,
+                      obscureText: field.obscure,
+                      keyboardType: field.keyboard,
+                      maxLines: field.obscure ? 1 : field.maxLines,
+                      decoration: InputDecoration(
+                        labelText: field.label,
+                        prefixIcon: Icon(field.icon),
+                        suffixIcon: field.suffix,
+                        alignLabelWithHint: field.maxLines > 1,
                       ),
+                      validator: (value) {
+                        final text = value?.trim() ?? '';
+                        if (text.isEmpty) return '${field.label} wajib diisi';
+                        if (field.label == 'Email' && !text.contains('@')) {
+                          return 'Format email belum sesuai';
+                        }
+                        if (field.label == 'Password' && text.length < 6) {
+                          return 'Password minimal 6 karakter';
+                        }
+                        return null;
+                      },
                     ),
-                    validator: (value) {
-                      if ((value ?? '').isEmpty) {
-                        return 'Password wajib diisi';
-                      }
-
-                      if (value!.length < 6) {
-                        return 'Password minimal 6 karakter';
-                      }
-
-                      return null;
-                    },
-                  ),
-                  const SizedBox(height: 14),
-                  TextFormField(
-                    controller: _phoneController,
-                    keyboardType: TextInputType.phone,
-                    textInputAction: TextInputAction.next,
-                    decoration: const InputDecoration(
-                      labelText: 'Nomor telepon',
-                      prefixIcon: Icon(Icons.phone_outlined),
+                    const SizedBox(height: 14),
+                  ],
+                  if (error != null) ...[
+                    Text(
+                      error!,
+                      style: const TextStyle(color: AppColors.danger),
                     ),
-                    validator: (value) {
-                      if ((value ?? '').trim().isEmpty) {
-                        return 'Nomor telepon wajib diisi';
-                      }
-
-                      return null;
-                    },
-                  ),
-                  const SizedBox(height: 14),
-                  TextFormField(
-                    controller: _addressController,
-                    minLines: 3,
-                    maxLines: 4,
-                    textInputAction: TextInputAction.done,
-                    decoration: const InputDecoration(
-                      labelText: 'Alamat',
-                      alignLabelWithHint: true,
-                      prefixIcon: Icon(Icons.location_on_outlined),
-                    ),
-                    validator: (value) {
-                      if ((value ?? '').trim().isEmpty) {
-                        return 'Alamat wajib diisi';
-                      }
-
-                      return null;
-                    },
-                    onFieldSubmitted: (_) => _submit(),
-                  ),
-                  const SizedBox(height: 20),
+                    const SizedBox(height: 14),
+                  ],
                   SizedBox(
                     width: double.infinity,
+                    height: 52,
                     child: FilledButton(
-                      onPressed: _submit,
-                      child: const Text('Daftar'),
+                      onPressed: loading ? null : onSubmit,
+                      child: Text(loading ? 'Memproses...' : 'Daftar'),
                     ),
                   ),
                 ],
@@ -193,4 +216,24 @@ class _RegisterCustomerPageState extends State<RegisterCustomerPage> {
       ),
     );
   }
+}
+
+class _TextFieldConfig {
+  const _TextFieldConfig(
+    this.controller,
+    this.label,
+    this.icon, {
+    this.keyboard,
+    this.obscure = false,
+    this.maxLines = 1,
+    this.suffix,
+  });
+
+  final TextEditingController controller;
+  final String label;
+  final IconData icon;
+  final TextInputType? keyboard;
+  final bool obscure;
+  final int maxLines;
+  final Widget? suffix;
 }

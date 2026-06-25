@@ -1,139 +1,228 @@
 import 'package:flutter/material.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
+import '../../app/app.dart';
 import '../../app/theme.dart';
-import '../auth/login_page.dart';
+import '../../core/models/mobile_models.dart';
+import '../../core/services/marketplace_repository.dart';
+import '../../shared/mobile_ui.dart';
+import '../customer/technician_detail_page.dart';
 
-class GuestHomePage extends StatelessWidget {
+class GuestHomePage extends StatefulWidget {
   const GuestHomePage({super.key});
 
-  static const _categories = [
-    _ServiceCategory('Komputer', Icons.desktop_windows_outlined),
-    _ServiceCategory('Laptop', Icons.laptop_mac_outlined),
-    _ServiceCategory('Handphone', Icons.smartphone_outlined),
-    _ServiceCategory('Printer', Icons.print_outlined),
-    _ServiceCategory('CCTV', Icons.videocam_outlined),
-    _ServiceCategory('Jaringan', Icons.router_outlined),
-  ];
+  @override
+  State<GuestHomePage> createState() => _GuestHomePageState();
+}
 
-  static const _technicians = [
-    _Technician('Budi Santoso', 'Laptop dan komputer', 'Solo Kota', 4.8),
-    _Technician('Rina Pratama', 'Printer dan jaringan', 'Laweyan', 4.7),
-    _Technician('Agus Wijaya', 'CCTV dan instalasi', 'Jebres', 4.9),
-  ];
+class _GuestHomePageState extends State<GuestHomePage> {
+  late final MarketplaceRepository _repo;
+  late Future<_GuestHomeData> _future;
+
+  @override
+  void initState() {
+    super.initState();
+    _repo = MarketplaceRepository(Supabase.instance.client);
+    _future = _load();
+  }
+
+  Future<_GuestHomeData> _load() async {
+    final results = await Future.wait([
+      _repo.categories(),
+      _repo.technicians(),
+    ]);
+    return _GuestHomeData(
+      categories: results[0] as List<ServiceCategory>,
+      technicians: results[1] as List<TechnicianSummary>,
+    );
+  }
+
+  void _refresh() => setState(() => _future = _load());
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Si Teknisi'),
-        actions: [
-          TextButton(
-            onPressed: () {
-              Navigator.of(
-                context,
-              ).push(MaterialPageRoute(builder: (_) => const LoginPage()));
-            },
-            child: const Text('Masuk'),
-          ),
-        ],
-      ),
       body: SafeArea(
-        child: ListView(
-          padding: const EdgeInsets.all(16),
-          children: [
-            const _HeroSection(),
-            const SizedBox(height: 24),
-            _SectionHeader(
-              title: 'Kategori layanan',
-              actionLabel: 'Lihat semua',
-              onActionPressed: () {},
-            ),
-            const SizedBox(height: 12),
-            const _CategoryGrid(categories: _categories),
-            const SizedBox(height: 24),
-            _SectionHeader(
-              title: 'Teknisi unggulan',
-              actionLabel: 'Cari teknisi',
-              onActionPressed: () {},
-            ),
-            const SizedBox(height: 12),
-            for (final technician in _technicians) ...[
-              _TechnicianCard(technician: technician),
-              const SizedBox(height: 12),
-            ],
-          ],
+        child: FutureBuilder<_GuestHomeData>(
+          future: _future,
+          builder: (context, snapshot) {
+            if (snapshot.connectionState == ConnectionState.waiting) {
+              return const Center(child: CircularProgressIndicator());
+            }
+            if (snapshot.hasError) {
+              return ErrorState(
+                message: snapshot.error.toString(),
+                onRetry: _refresh,
+              );
+            }
+            final data = snapshot.data!;
+            return RefreshIndicator(
+              onRefresh: () async => _refresh(),
+              child: ListView(
+                padding: const EdgeInsets.fromLTRB(18, 14, 18, 28),
+                children: [
+                  Row(
+                    children: [
+                      const AppLogoMark(size: 46),
+                      const SizedBox(width: 12),
+                      const Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              'Si Teknisi',
+                              style: TextStyle(
+                                color: AppColors.textPrimary,
+                                fontSize: 18,
+                                fontWeight: FontWeight.w900,
+                              ),
+                            ),
+                            Text(
+                              'Marketplace teknisi wilayah Solo',
+                              style: TextStyle(
+                                color: AppColors.textSecondary,
+                                fontSize: 12,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      IconButton(
+                        onPressed: () =>
+                            Navigator.pushNamed(context, AppRoutes.login),
+                        icon: const Icon(Icons.login_rounded),
+                        tooltip: 'Masuk',
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 18),
+                  const _GuestHero(),
+                  const SizedBox(height: 22),
+                  MobileSectionHeader(
+                    title: 'Kategori layanan',
+                    subtitle: '${data.categories.length} kategori aktif',
+                  ),
+                  const SizedBox(height: 12),
+                  _CategoryGrid(categories: data.categories),
+                  const SizedBox(height: 24),
+                  MobileSectionHeader(
+                    title: 'Teknisi tersedia',
+                    subtitle: 'Pilih teknisi sendiri sesuai PRD',
+                    action: TextButton(
+                      onPressed: _refresh,
+                      child: const Text('Refresh'),
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  if (data.technicians.isEmpty)
+                    const SizedBox(
+                      height: 220,
+                      child: EmptyState(
+                        message: 'Belum ada teknisi verified',
+                        icon: Icons.engineering_outlined,
+                      ),
+                    )
+                  else
+                    for (final technician in data.technicians) ...[
+                      _TechnicianCard(
+                        technician: technician,
+                        onTap: () => Navigator.of(context).push(
+                          MaterialPageRoute(
+                            builder: (_) => TechnicianDetailPage(
+                              technicianId: technician.id,
+                            ),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+                    ],
+                ],
+              ),
+            );
+          },
         ),
       ),
     );
   }
 }
 
-class _HeroSection extends StatelessWidget {
-  const _HeroSection();
+class _GuestHero extends StatelessWidget {
+  const _GuestHero();
 
   @override
   Widget build(BuildContext context) {
     return Container(
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
-        color: AppColors.primary,
-        borderRadius: BorderRadius.circular(8),
+        gradient: const LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [AppColors.primary, Color(0xFF0F766E)],
+        ),
+        borderRadius: BorderRadius.circular(22),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text(
-            'Temukan teknisi terpercaya di Solo',
-            style: TextStyle(
-              color: Colors.white,
-              fontSize: 24,
-              fontWeight: FontWeight.w700,
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+            decoration: BoxDecoration(
+              color: Colors.white.withValues(alpha: 0.14),
+              borderRadius: BorderRadius.circular(999),
+            ),
+            child: const Text(
+              'Servis komputer, laptop, HP, CCTV, printer',
+              style: TextStyle(
+                color: Colors.white,
+                fontSize: 11,
+                fontWeight: FontWeight.w700,
+              ),
             ),
           ),
-          const SizedBox(height: 8),
-          const Text(
-            'Pilih layanan, cek estimasi harga, lalu pesan teknisi sesuai kebutuhan.',
-            style: TextStyle(color: Color(0xFFE5E7EB), height: 1.4),
-          ),
           const SizedBox(height: 16),
-          FilledButton.icon(
-            onPressed: () {},
-            icon: const Icon(Icons.search),
-            label: const Text('Cari layanan'),
-            style: FilledButton.styleFrom(backgroundColor: AppColors.secondary),
+          const Text(
+            'Cari teknisi terpercaya tanpa ribet',
+            style: TextStyle(
+              color: Colors.white,
+              fontSize: 27,
+              fontWeight: FontWeight.w900,
+              height: 1.05,
+            ),
+          ),
+          const SizedBox(height: 10),
+          Text(
+            'Lihat profil, cek estimasi harga, lalu login untuk membuat pesanan.',
+            style: TextStyle(
+              color: Colors.white.withValues(alpha: 0.82),
+              height: 1.45,
+            ),
+          ),
+          const SizedBox(height: 18),
+          Row(
+            children: [
+              Expanded(
+                child: FilledButton.icon(
+                  onPressed: () =>
+                      Navigator.pushNamed(context, AppRoutes.registerCustomer),
+                  icon: const Icon(Icons.person_add_alt_1_rounded),
+                  label: const Text('Daftar Customer'),
+                  style: FilledButton.styleFrom(
+                    backgroundColor: Colors.white,
+                    foregroundColor: AppColors.primary,
+                    padding: const EdgeInsets.symmetric(vertical: 13),
+                  ),
+                ),
+              ),
+              const SizedBox(width: 10),
+              IconButton.filledTonal(
+                onPressed: () => Navigator.pushNamed(context, AppRoutes.login),
+                icon: const Icon(Icons.arrow_forward_rounded),
+                tooltip: 'Masuk',
+              ),
+            ],
           ),
         ],
       ),
-    );
-  }
-}
-
-class _SectionHeader extends StatelessWidget {
-  const _SectionHeader({
-    required this.title,
-    required this.actionLabel,
-    required this.onActionPressed,
-  });
-
-  final String title;
-  final String actionLabel;
-  final VoidCallback onActionPressed;
-
-  @override
-  Widget build(BuildContext context) {
-    return Row(
-      children: [
-        Expanded(
-          child: Text(
-            title,
-            style: Theme.of(context).textTheme.titleLarge?.copyWith(
-              fontWeight: FontWeight.w700,
-              color: AppColors.textPrimary,
-            ),
-          ),
-        ),
-        TextButton(onPressed: onActionPressed, child: Text(actionLabel)),
-      ],
     );
   }
 }
@@ -141,44 +230,56 @@ class _SectionHeader extends StatelessWidget {
 class _CategoryGrid extends StatelessWidget {
   const _CategoryGrid({required this.categories});
 
-  final List<_ServiceCategory> categories;
+  final List<ServiceCategory> categories;
 
   @override
   Widget build(BuildContext context) {
+    if (categories.isEmpty) {
+      return const SizedBox(
+        height: 180,
+        child: EmptyState(message: 'Belum ada kategori aktif'),
+      );
+    }
     return GridView.builder(
       itemCount: categories.length,
       shrinkWrap: true,
       physics: const NeverScrollableScrollPhysics(),
       gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
         crossAxisCount: 3,
-        mainAxisSpacing: 12,
-        crossAxisSpacing: 12,
-        childAspectRatio: 0.95,
+        mainAxisSpacing: 10,
+        crossAxisSpacing: 10,
+        childAspectRatio: 0.9,
       ),
       itemBuilder: (context, index) {
         final category = categories[index];
-
-        return Card(
-          child: InkWell(
-            borderRadius: BorderRadius.circular(8),
-            onTap: () {},
-            child: Padding(
-              padding: const EdgeInsets.all(12),
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Icon(category.icon, color: AppColors.secondary, size: 28),
-                  const SizedBox(height: 10),
-                  Text(
-                    category.name,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    textAlign: TextAlign.center,
-                    style: const TextStyle(fontWeight: FontWeight.w600),
-                  ),
-                ],
+        return Container(
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(color: const Color(0xFFE5E7EB)),
+          ),
+          padding: const EdgeInsets.all(10),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(
+                categoryIcon(category.name),
+                color: AppColors.secondary,
+                size: 28,
               ),
-            ),
+              const SizedBox(height: 9),
+              Text(
+                category.name,
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+                textAlign: TextAlign.center,
+                style: const TextStyle(
+                  color: AppColors.textPrimary,
+                  fontSize: 12,
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
+            ],
           ),
         );
       },
@@ -187,24 +288,28 @@ class _CategoryGrid extends StatelessWidget {
 }
 
 class _TechnicianCard extends StatelessWidget {
-  const _TechnicianCard({required this.technician});
+  const _TechnicianCard({required this.technician, required this.onTap});
 
-  final _Technician technician;
+  final TechnicianSummary technician;
+  final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
-    return Card(
+    return Material(
+      color: Colors.white,
+      borderRadius: BorderRadius.circular(18),
       child: InkWell(
-        borderRadius: BorderRadius.circular(8),
-        onTap: () {},
+        borderRadius: BorderRadius.circular(18),
+        onTap: onTap,
         child: Padding(
           padding: const EdgeInsets.all(14),
           child: Row(
             children: [
               CircleAvatar(
+                radius: 25,
                 backgroundColor: AppColors.secondary.withValues(alpha: 0.12),
                 foregroundColor: AppColors.secondary,
-                child: const Icon(Icons.engineering_outlined),
+                child: const Icon(Icons.engineering_rounded),
               ),
               const SizedBox(width: 12),
               Expanded(
@@ -213,29 +318,50 @@ class _TechnicianCard extends StatelessWidget {
                   children: [
                     Text(
                       technician.name,
-                      style: const TextStyle(fontWeight: FontWeight.w700),
+                      style: const TextStyle(
+                        color: AppColors.textPrimary,
+                        fontWeight: FontWeight.w900,
+                      ),
                     ),
                     const SizedBox(height: 4),
                     Text(
-                      '${technician.skill} - ${technician.area}',
+                      '${technician.skills.take(2).join(', ')} - ${technician.serviceArea}',
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                       style: const TextStyle(
                         color: AppColors.textSecondary,
-                        fontSize: 13,
+                        fontSize: 12,
                       ),
+                    ),
+                    const SizedBox(height: 7),
+                    Row(
+                      children: [
+                        const Icon(
+                          Icons.star_rounded,
+                          color: AppColors.warning,
+                          size: 16,
+                        ),
+                        const SizedBox(width: 3),
+                        Text(
+                          technician.rating == 0
+                              ? 'Baru'
+                              : technician.rating.toStringAsFixed(1),
+                          style: const TextStyle(fontSize: 12),
+                        ),
+                        const SizedBox(width: 10),
+                        Text(
+                          '${technician.completedJobs} pekerjaan',
+                          style: const TextStyle(
+                            color: AppColors.textSecondary,
+                            fontSize: 12,
+                          ),
+                        ),
+                      ],
                     ),
                   ],
                 ),
               ),
-              const SizedBox(width: 12),
-              Row(
-                children: [
-                  const Icon(Icons.star, color: AppColors.warning, size: 18),
-                  const SizedBox(width: 4),
-                  Text(technician.rating.toStringAsFixed(1)),
-                ],
-              ),
+              const Icon(Icons.chevron_right_rounded),
             ],
           ),
         ),
@@ -244,18 +370,9 @@ class _TechnicianCard extends StatelessWidget {
   }
 }
 
-class _ServiceCategory {
-  const _ServiceCategory(this.name, this.icon);
+class _GuestHomeData {
+  const _GuestHomeData({required this.categories, required this.technicians});
 
-  final String name;
-  final IconData icon;
-}
-
-class _Technician {
-  const _Technician(this.name, this.skill, this.area, this.rating);
-
-  final String name;
-  final String skill;
-  final String area;
-  final double rating;
+  final List<ServiceCategory> categories;
+  final List<TechnicianSummary> technicians;
 }
