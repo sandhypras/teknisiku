@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../features/guest/home_page.dart';
 import 'theme.dart';
 
 class SiTeknisiApp extends StatelessWidget {
@@ -11,7 +12,7 @@ class SiTeknisiApp extends StatelessWidget {
       title: 'Si Teknisi',
       debugShowCheckedModeBanner: false,
       theme: AppTheme.light(),
-      home: const Scaffold(body: Center(child: Text('Si Teknisi'))),
+      home: const GuestHomePage(),
     );
   }
 }
