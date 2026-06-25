@@ -22,3 +22,8 @@ flutter:
 
   assets:
     - .env.example
+    - assets/images/
+    - assets/icons/
+    - assets/logos/
+    - assets/illustrations/
+    - assets/placeholders/
