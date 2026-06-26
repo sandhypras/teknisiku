@@ -1,3 +1,5 @@
+import 'dart:typed_data';
+
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../models/mobile_models.dart';
@@ -12,12 +14,16 @@ class MarketplaceRepository {
   Future<List<ServiceCategory>> categories() async {
     final data = await _client
         .from('categories')
-        .select('id, name, description')
+        .select('id, name, description, icon_url')
         .eq('is_active', true)
         .order('name');
-    return List<Map<String, dynamic>>.from(
-      data,
-    ).map(ServiceCategory.fromJson).toList();
+    return List<Map<String, dynamic>>.from(data).map((json) {
+      final rawIcon = json['icon_url'] as String?;
+      return ServiceCategory.fromJson({
+        ...json,
+        'icon_url': _publicCategoryIconUrl(rawIcon),
+      });
+    }).toList();
   }
 
   Future<List<TechnicianSummary>> technicians({String? query}) async {
@@ -196,7 +202,7 @@ class MarketplaceRepository {
     final data = await _client
         .from('orders')
         .select(
-          'id, order_number, status, problem_description, schedule_date, schedule_time, estimated_total, final_total, created_at, customer:profiles!customer_id(full_name), technician:technician_profiles!technician_id(profile:profiles!user_id(full_name))',
+          'id, order_number, status, problem_description, schedule_date, schedule_time, estimated_total, final_total, created_at, customer:profiles!customer_id(full_name, phone), address:customer_addresses!address_id(full_address, city), technician:technician_profiles!technician_id(profile:profiles!user_id(full_name))',
         )
         .eq('customer_id', id)
         .order('created_at', ascending: false);
@@ -241,6 +247,69 @@ class MarketplaceRepository {
     }, onConflict: 'user_id');
   }
 
+  Future<List<TechnicianDocument>> technicianDocuments(
+    String technicianId,
+  ) async {
+    final data = await _client
+        .from('technician_documents')
+        .select('id, technician_id, document_type, file_url, uploaded_at')
+        .eq('technician_id', technicianId)
+        .order('uploaded_at', ascending: false);
+    return List<Map<String, dynamic>>.from(
+      data,
+    ).map(TechnicianDocument.fromJson).toList();
+  }
+
+  Future<TechnicianDocument> uploadTechnicianDocument({
+    required String technicianId,
+    required String documentType,
+    required Uint8List bytes,
+    required String fileName,
+    String? contentType,
+  }) async {
+    final id = userId;
+    if (id == null) throw StateError('User belum login');
+    final safeType = documentType.trim().toLowerCase();
+    final extension = _fileExtension(fileName, contentType);
+    final path =
+        '$id/$technicianId/$safeType-${DateTime.now().millisecondsSinceEpoch}$extension';
+    await _client.storage
+        .from('technician-documents')
+        .uploadBinary(
+          path,
+          bytes,
+          fileOptions: FileOptions(
+            contentType: contentType ?? _contentTypeFromExtension(extension),
+            upsert: true,
+          ),
+        );
+    final existing = await _client
+        .from('technician_documents')
+        .select('id')
+        .eq('technician_id', technicianId)
+        .eq('document_type', safeType)
+        .maybeSingle();
+    final payload = {
+      'technician_id': technicianId,
+      'document_type': safeType,
+      'file_url': 'technician-documents/$path',
+      'uploaded_at': DateTime.now().toIso8601String(),
+    };
+    final row = existing == null
+        ? await _client
+              .from('technician_documents')
+              .insert(payload)
+              .select('id, technician_id, document_type, file_url, uploaded_at')
+              .single()
+        : await _client
+              .from('technician_documents')
+              .update(payload)
+              .eq('id', existing['id'] as String)
+              .select('id, technician_id, document_type, file_url, uploaded_at')
+              .single();
+    return TechnicianDocument.fromJson(row);
+  }
+
   Future<void> createTechnicianService({
     required String technicianId,
     required String categoryId,
@@ -265,7 +334,7 @@ class MarketplaceRepository {
     final data = await _client
         .from('orders')
         .select(
-          'id, order_number, status, problem_description, schedule_date, schedule_time, estimated_total, final_total, created_at, customer:profiles!customer_id(full_name), technician:technician_profiles!technician_id(profile:profiles!user_id(full_name))',
+          'id, order_number, status, problem_description, schedule_date, schedule_time, estimated_total, final_total, created_at, customer:profiles!customer_id(full_name, phone), address:customer_addresses!address_id(full_address, city), technician:technician_profiles!technician_id(profile:profiles!user_id(full_name))',
         )
         .eq('technician_id', technicianId)
         .order('created_at', ascending: false);
@@ -277,4 +346,55 @@ class MarketplaceRepository {
   Future<void> updateOrderStatus(String orderId, String status) async {
     await _client.from('orders').update({'status': status}).eq('id', orderId);
   }
+}
+
+String? _publicCategoryIconUrl(String? path) {
+  if (path == null || path.trim().isEmpty) return null;
+  final value = path.trim();
+  if (value.startsWith('http')) return value;
+
+  const supportedBuckets = [
+    'category-images',
+    'service-images',
+    'profile-images',
+  ];
+  var bucket = 'category-images';
+  var objectPath = value;
+  for (final candidate in supportedBuckets) {
+    final prefix = '$candidate/';
+    if (value.startsWith(prefix)) {
+      bucket = candidate;
+      objectPath = value.substring(prefix.length);
+      break;
+    }
+  }
+  if (objectPath.isEmpty) return null;
+
+  return Supabase.instance.client.storage.from(bucket).getPublicUrl(objectPath);
+}
+
+String _fileExtension(String fileName, String? contentType) {
+  final normalized = fileName.toLowerCase();
+  final dotIndex = normalized.lastIndexOf('.');
+  if (dotIndex >= 0 && dotIndex < normalized.length - 1) {
+    final extension = normalized.substring(dotIndex);
+    if (['.jpg', '.jpeg', '.png', '.webp', '.pdf'].contains(extension)) {
+      return extension;
+    }
+  }
+  return switch (contentType) {
+    'image/png' => '.png',
+    'image/webp' => '.webp',
+    'application/pdf' => '.pdf',
+    _ => '.jpg',
+  };
+}
+
+String _contentTypeFromExtension(String extension) {
+  return switch (extension) {
+    '.png' => 'image/png',
+    '.webp' => 'image/webp',
+    '.pdf' => 'application/pdf',
+    _ => 'image/jpeg',
+  };
 }

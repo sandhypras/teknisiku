@@ -23,7 +23,9 @@ class _AdminServicesScreenState extends State<AdminServicesScreen>
     super.initState();
     _tabController = TabController(length: _tabs.length, vsync: this);
     _tabController.addListener(
-      () => setState(() => _future = _fetch(_filters[_tabController.index])),
+      () => setState(() {
+        _future = _fetch(_filters[_tabController.index]);
+      }),
     );
     _future = _fetch(null);
   }
@@ -53,7 +55,43 @@ class _AdminServicesScreenState extends State<AdminServicesScreen>
         .from('services')
         .update({'approval_status': status, 'rejection_reason': ?reason})
         .eq('id', id);
-    setState(() => _future = _fetch(_filters[_tabController.index]));
+    setState(() {
+      _future = _fetch(_filters[_tabController.index]);
+    });
+  }
+
+  Future<void> _updateService(
+    String id, {
+    required String name,
+    required String description,
+    required double price,
+    required String duration,
+    required bool isActive,
+    required String status,
+  }) async {
+    await Supabase.instance.client
+        .from('services')
+        .update({
+          'name': name,
+          'description': description.trim().isEmpty ? null : description.trim(),
+          'estimated_price': price,
+          'estimated_duration': duration.trim().isEmpty
+              ? null
+              : duration.trim(),
+          'is_active': isActive,
+          'approval_status': status,
+        })
+        .eq('id', id);
+    setState(() {
+      _future = _fetch(_filters[_tabController.index]);
+    });
+  }
+
+  Future<void> _deleteService(String id) async {
+    await Supabase.instance.client.from('services').delete().eq('id', id);
+    setState(() {
+      _future = _fetch(_filters[_tabController.index]);
+    });
   }
 
   @override
@@ -100,6 +138,9 @@ class _AdminServicesScreenState extends State<AdminServicesScreen>
                         _updateStatus(list[i]['id'] as String, 'approved'),
                     onReject: () =>
                         _showRejectDialog(context, list[i]['id'] as String),
+                    onDetail: () => _showServiceDetail(list[i]),
+                    onEdit: () => _showServiceEdit(list[i]),
+                    onDelete: () => _confirmDeleteService(list[i]),
                   ),
                 );
               },
@@ -141,6 +182,168 @@ class _AdminServicesScreenState extends State<AdminServicesScreen>
       ),
     );
   }
+
+  void _showServiceDetail(Map<String, dynamic> data) {
+    final category = data['category'] as Map<String, dynamic>?;
+    final techProfile =
+        (data['technician'] as Map<String, dynamic>?)?['profile']
+            as Map<String, dynamic>?;
+    showDialog(
+      context: context,
+      builder: (_) => AlertDialog(
+        title: Text(data['name'] as String? ?? 'Detail Layanan'),
+        content: SizedBox(
+          width: 520,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              _DetailLine('Kategori', '${category?['name'] ?? '-'}'),
+              _DetailLine('Teknisi', '${techProfile?['full_name'] ?? '-'}'),
+              _DetailLine(
+                'Harga',
+                _ServiceCard._formatCurrency(
+                  (data['estimated_price'] as num?)?.toDouble() ?? 0,
+                ),
+              ),
+              _DetailLine(
+                'Durasi',
+                data['estimated_duration'] as String? ?? '-',
+              ),
+              _DetailLine('Status', data['approval_status'] as String? ?? '-'),
+              _DetailLine(
+                'Aktif',
+                (data['is_active'] as bool? ?? true) ? 'Ya' : 'Tidak',
+              ),
+              const Divider(height: 24),
+              Text(data['description'] as String? ?? 'Tidak ada deskripsi'),
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Tutup'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showServiceEdit(Map<String, dynamic> data) {
+    final nameCtrl = TextEditingController(text: data['name'] as String? ?? '');
+    final descCtrl = TextEditingController(
+      text: data['description'] as String? ?? '',
+    );
+    final priceCtrl = TextEditingController(
+      text: '${(data['estimated_price'] as num?)?.toDouble() ?? 0}',
+    );
+    final durationCtrl = TextEditingController(
+      text: data['estimated_duration'] as String? ?? '',
+    );
+    var isActive = data['is_active'] as bool? ?? true;
+    var status = data['approval_status'] as String? ?? 'pending';
+    showDialog(
+      context: context,
+      builder: (_) => StatefulBuilder(
+        builder: (context, setS) => AlertDialog(
+          title: const Text('Edit Layanan'),
+          content: SizedBox(
+            width: 460,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                TextField(
+                  controller: nameCtrl,
+                  decoration: const InputDecoration(labelText: 'Nama layanan'),
+                ),
+                TextField(
+                  controller: descCtrl,
+                  decoration: const InputDecoration(labelText: 'Deskripsi'),
+                  maxLines: 3,
+                ),
+                TextField(
+                  controller: priceCtrl,
+                  decoration: const InputDecoration(labelText: 'Harga'),
+                  keyboardType: TextInputType.number,
+                ),
+                TextField(
+                  controller: durationCtrl,
+                  decoration: const InputDecoration(labelText: 'Durasi'),
+                ),
+                SwitchListTile(
+                  value: isActive,
+                  onChanged: (v) => setS(() => isActive = v),
+                  title: const Text('Aktif'),
+                ),
+                DropdownButtonFormField<String>(
+                  initialValue: status,
+                  decoration: const InputDecoration(labelText: 'Approval'),
+                  items: const [
+                    DropdownMenuItem(value: 'pending', child: Text('Pending')),
+                    DropdownMenuItem(
+                      value: 'approved',
+                      child: Text('Approved'),
+                    ),
+                    DropdownMenuItem(
+                      value: 'rejected',
+                      child: Text('Rejected'),
+                    ),
+                  ],
+                  onChanged: (value) => setS(() => status = value ?? status),
+                ),
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('Batal'),
+            ),
+            FilledButton(
+              onPressed: () {
+                Navigator.pop(context);
+                _updateService(
+                  data['id'] as String,
+                  name: nameCtrl.text.trim(),
+                  description: descCtrl.text,
+                  price: double.tryParse(priceCtrl.text.trim()) ?? 0,
+                  duration: durationCtrl.text,
+                  isActive: isActive,
+                  status: status,
+                );
+              },
+              child: const Text('Simpan'),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _confirmDeleteService(Map<String, dynamic> data) {
+    showDialog(
+      context: context,
+      builder: (_) => AlertDialog(
+        title: const Text('Hapus Layanan'),
+        content: Text('Hapus layanan ${data['name'] ?? ''}?'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Batal'),
+          ),
+          FilledButton(
+            onPressed: () {
+              Navigator.pop(context);
+              _deleteService(data['id'] as String);
+            },
+            style: FilledButton.styleFrom(backgroundColor: AppColors.error),
+            child: const Text('Hapus'),
+          ),
+        ],
+      ),
+    );
+  }
 }
 
 class _ServiceCard extends StatelessWidget {
@@ -148,11 +351,17 @@ class _ServiceCard extends StatelessWidget {
     required this.data,
     required this.onApprove,
     required this.onReject,
+    required this.onDetail,
+    required this.onEdit,
+    required this.onDelete,
   });
 
   final Map<String, dynamic> data;
   final VoidCallback onApprove;
   final VoidCallback onReject;
+  final VoidCallback onDetail;
+  final VoidCallback onEdit;
+  final VoidCallback onDelete;
 
   @override
   Widget build(BuildContext context) {
@@ -224,6 +433,18 @@ class _ServiceCard extends StatelessWidget {
                   label: badge.label,
                   color: badge.color,
                   bg: badge.bg,
+                ),
+                PopupMenuButton<String>(
+                  onSelected: (value) {
+                    if (value == 'detail') onDetail();
+                    if (value == 'edit') onEdit();
+                    if (value == 'delete') onDelete();
+                  },
+                  itemBuilder: (_) => const [
+                    PopupMenuItem(value: 'detail', child: Text('Detail')),
+                    PopupMenuItem(value: 'edit', child: Text('Edit')),
+                    PopupMenuItem(value: 'delete', child: Text('Hapus')),
+                  ],
                 ),
               ],
             ),
@@ -316,6 +537,36 @@ class _ServiceCard extends StatelessWidget {
 
   static String _formatCurrency(double amount) =>
       'Rp ${amount.toStringAsFixed(0).replaceAllMapped(RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'), (m) => '${m[1]}.')}';
+}
+
+class _DetailLine extends StatelessWidget {
+  const _DetailLine(this.label, this.value);
+  final String label;
+  final String value;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 8),
+      child: Row(
+        children: [
+          SizedBox(
+            width: 90,
+            child: Text(
+              label,
+              style: const TextStyle(color: AppColors.textSecondary),
+            ),
+          ),
+          Expanded(
+            child: Text(
+              value,
+              style: const TextStyle(fontWeight: FontWeight.w700),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
 }
 
 class _BadgeStyle {

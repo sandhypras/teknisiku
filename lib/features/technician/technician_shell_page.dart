@@ -6,6 +6,7 @@ import '../../core/models/mobile_models.dart';
 import '../../core/services/auth_service.dart';
 import '../../core/services/marketplace_repository.dart';
 import 'technician_dashboard_page.dart';
+import 'technician_orders_page.dart';
 import 'technician_profile_page.dart';
 import 'technician_services_page.dart';
 
@@ -31,6 +32,7 @@ class _TechnicianShellPageState extends State<TechnicianShellPage> {
     final repo = MarketplaceRepository(Supabase.instance.client);
     final pages = [
       TechnicianDashboardPage(profile: widget.profile, repo: repo),
+      TechnicianOrdersPage(repo: repo),
       TechnicianServicesPage(repo: repo),
       TechnicianProfilePage(
         profile: widget.profile,
@@ -46,19 +48,24 @@ class _TechnicianShellPageState extends State<TechnicianShellPage> {
         onDestinationSelected: (value) => setState(() => _index = value),
         destinations: const [
           NavigationDestination(
-            icon: Icon(Icons.dashboard_outlined),
-            selectedIcon: Icon(Icons.dashboard_rounded),
-            label: 'Dashboard',
+            icon: Icon(Icons.home_outlined),
+            selectedIcon: Icon(Icons.home_rounded),
+            label: 'Beranda',
           ),
           NavigationDestination(
-            icon: Icon(Icons.build_outlined),
-            selectedIcon: Icon(Icons.build_rounded),
-            label: 'Layanan',
+            icon: Icon(Icons.work_outline_rounded),
+            selectedIcon: Icon(Icons.work_rounded),
+            label: 'Order Saya',
+          ),
+          NavigationDestination(
+            icon: Icon(Icons.chat_bubble_outline_rounded),
+            selectedIcon: Icon(Icons.chat_bubble_rounded),
+            label: 'Pesan',
           ),
           NavigationDestination(
             icon: Icon(Icons.person_outline_rounded),
             selectedIcon: Icon(Icons.person_rounded),
-            label: 'Profil',
+            label: 'Akun',
           ),
         ],
       ),

@@ -78,7 +78,9 @@ class _AdminReportsScreenState extends State<AdminReportsScreen> {
           AdminPageHeader(
             title: 'Laporan',
             subtitle: 'Ringkasan performa operasional',
-            onRefresh: () => setState(() => _future = _fetch()),
+            onRefresh: () => setState(() {
+              _future = _fetch();
+            }),
           ),
           Expanded(
             child: FutureBuilder<_ReportData>(
@@ -90,7 +92,9 @@ class _AdminReportsScreenState extends State<AdminReportsScreen> {
                 if (snapshot.hasError) {
                   return AdminErrorState(
                     message: snapshot.error.toString(),
-                    onRetry: () => setState(() => _future = _fetch()),
+                    onRetry: () => setState(() {
+                      _future = _fetch();
+                    }),
                   );
                 }
                 final data = snapshot.data!;

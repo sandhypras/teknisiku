@@ -53,7 +53,9 @@ class _CustomerHomePageState extends State<CustomerHomePage> {
     );
   }
 
-  void _refresh() => setState(() => _future = _load());
+  void _refresh() => setState(() {
+    _future = _load();
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -356,11 +358,7 @@ class _CategoryGrid extends StatelessWidget {
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              Icon(
-                categoryIcon(category.name),
-                color: const Color(0xFF1269D3),
-                size: 42,
-              ),
+              _CategoryIcon(category: category),
               const SizedBox(height: 10),
               Text(
                 category.name,
@@ -391,6 +389,41 @@ class _CategoryGrid extends StatelessWidget {
           ),
         );
       },
+    );
+  }
+}
+
+class _CategoryIcon extends StatelessWidget {
+  const _CategoryIcon({required this.category});
+
+  final ServiceCategory category;
+
+  @override
+  Widget build(BuildContext context) {
+    final iconUrl = category.iconUrl;
+    return Container(
+      width: 52,
+      height: 52,
+      padding: const EdgeInsets.all(8),
+      decoration: BoxDecoration(
+        color: const Color(0xFFEAF4FF),
+        borderRadius: BorderRadius.circular(16),
+      ),
+      child: iconUrl == null || iconUrl.isEmpty
+          ? Icon(
+              categoryIcon(category.name),
+              color: const Color(0xFF1269D3),
+              size: 36,
+            )
+          : Image.network(
+              iconUrl,
+              fit: BoxFit.contain,
+              errorBuilder: (_, _, _) => Icon(
+                categoryIcon(category.name),
+                color: const Color(0xFF1269D3),
+                size: 36,
+              ),
+            ),
     );
   }
 }

@@ -31,7 +31,26 @@ class _AdminReviewsScreenState extends State<AdminReviewsScreen> {
 
   Future<void> _delete(String id) async {
     await Supabase.instance.client.from('reviews').delete().eq('id', id);
-    setState(() => _future = _fetch());
+    setState(() {
+      _future = _fetch();
+    });
+  }
+
+  Future<void> _updateReview(
+    String id, {
+    required int rating,
+    required String comment,
+  }) async {
+    await Supabase.instance.client
+        .from('reviews')
+        .update({
+          'rating': rating,
+          'comment': comment.trim().isEmpty ? null : comment.trim(),
+        })
+        .eq('id', id);
+    setState(() {
+      _future = _fetch();
+    });
   }
 
   @override
@@ -44,7 +63,9 @@ class _AdminReviewsScreenState extends State<AdminReviewsScreen> {
           AdminPageHeader(
             title: 'Ulasan',
             subtitle: 'Pantau feedback customer',
-            onRefresh: () => setState(() => _future = _fetch()),
+            onRefresh: () => setState(() {
+              _future = _fetch();
+            }),
           ),
           Expanded(
             child: FutureBuilder<List<Map<String, dynamic>>>(
@@ -56,7 +77,9 @@ class _AdminReviewsScreenState extends State<AdminReviewsScreen> {
                 if (snapshot.hasError) {
                   return AdminErrorState(
                     message: snapshot.error.toString(),
-                    onRetry: () => setState(() => _future = _fetch()),
+                    onRetry: () => setState(() {
+                      _future = _fetch();
+                    }),
                   );
                 }
                 final rows = snapshot.data ?? [];
@@ -68,6 +91,8 @@ class _AdminReviewsScreenState extends State<AdminReviewsScreen> {
                   itemCount: rows.length,
                   itemBuilder: (_, i) => _ReviewCard(
                     data: rows[i],
+                    onDetail: () => _showReviewDetail(rows[i]),
+                    onEdit: () => _showReviewEdit(rows[i]),
                     onDelete: () => _delete(rows[i]['id'] as String),
                   ),
                 );
@@ -78,12 +103,111 @@ class _AdminReviewsScreenState extends State<AdminReviewsScreen> {
       ),
     );
   }
+
+  void _showReviewDetail(Map<String, dynamic> data) {
+    final customer = data['customer'] as Map<String, dynamic>?;
+    final technician =
+        (data['technician'] as Map<String, dynamic>?)?['profile']
+            as Map<String, dynamic>?;
+    final order = data['order'] as Map<String, dynamic>?;
+    showDialog(
+      context: context,
+      builder: (_) => AlertDialog(
+        title: const Text('Detail Ulasan'),
+        content: SizedBox(
+          width: 520,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              _DetailLine('Customer', '${customer?['full_name'] ?? '-'}'),
+              _DetailLine('Teknisi', '${technician?['full_name'] ?? '-'}'),
+              _DetailLine('Order', '${order?['order_number'] ?? '-'}'),
+              _DetailLine('Rating', '${data['rating'] ?? 0}/5'),
+              const Divider(height: 24),
+              Text(data['comment'] as String? ?? 'Tidak ada komentar'),
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Tutup'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showReviewEdit(Map<String, dynamic> data) {
+    var rating = (data['rating'] as num?)?.toInt() ?? 5;
+    final commentCtrl = TextEditingController(
+      text: data['comment'] as String? ?? '',
+    );
+    showDialog(
+      context: context,
+      builder: (_) => StatefulBuilder(
+        builder: (context, setS) => AlertDialog(
+          title: const Text('Edit Ulasan'),
+          content: SizedBox(
+            width: 420,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                DropdownButtonFormField<int>(
+                  initialValue: rating.clamp(1, 5),
+                  decoration: const InputDecoration(labelText: 'Rating'),
+                  items: List.generate(
+                    5,
+                    (index) => DropdownMenuItem(
+                      value: index + 1,
+                      child: Text('${index + 1} bintang'),
+                    ),
+                  ),
+                  onChanged: (value) => setS(() => rating = value ?? rating),
+                ),
+                TextField(
+                  controller: commentCtrl,
+                  decoration: const InputDecoration(labelText: 'Komentar'),
+                  maxLines: 4,
+                ),
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('Batal'),
+            ),
+            FilledButton(
+              onPressed: () {
+                Navigator.pop(context);
+                _updateReview(
+                  data['id'] as String,
+                  rating: rating,
+                  comment: commentCtrl.text,
+                );
+              },
+              child: const Text('Simpan'),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
 }
 
 class _ReviewCard extends StatelessWidget {
-  const _ReviewCard({required this.data, required this.onDelete});
+  const _ReviewCard({
+    required this.data,
+    required this.onDelete,
+    required this.onDetail,
+    required this.onEdit,
+  });
   final Map<String, dynamic> data;
   final VoidCallback onDelete;
+  final VoidCallback onDetail;
+  final VoidCallback onEdit;
 
   @override
   Widget build(BuildContext context) {
@@ -134,10 +258,20 @@ class _ReviewCard extends StatelessWidget {
                 ),
               ),
               IconButton(
-                onPressed: onDelete,
-                tooltip: 'Hapus ulasan',
-                icon: const Icon(Icons.delete_outline_rounded),
-                color: AppColors.error,
+                onPressed: onDetail,
+                tooltip: 'Detail ulasan',
+                icon: const Icon(Icons.visibility_outlined),
+                color: AppColors.primaryBlue,
+              ),
+              PopupMenuButton<String>(
+                onSelected: (value) {
+                  if (value == 'edit') onEdit();
+                  if (value == 'delete') onDelete();
+                },
+                itemBuilder: (_) => const [
+                  PopupMenuItem(value: 'edit', child: Text('Edit')),
+                  PopupMenuItem(value: 'delete', child: Text('Hapus')),
+                ],
               ),
             ],
           ),
@@ -163,6 +297,36 @@ class _ReviewCard extends StatelessWidget {
               ),
             ),
           ],
+        ],
+      ),
+    );
+  }
+}
+
+class _DetailLine extends StatelessWidget {
+  const _DetailLine(this.label, this.value);
+  final String label;
+  final String value;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 8),
+      child: Row(
+        children: [
+          SizedBox(
+            width: 90,
+            child: Text(
+              label,
+              style: const TextStyle(color: AppColors.textSecondary),
+            ),
+          ),
+          Expanded(
+            child: Text(
+              value,
+              style: const TextStyle(fontWeight: FontWeight.w700),
+            ),
+          ),
         ],
       ),
     );

@@ -3,36 +3,190 @@
 
 create extension if not exists "pgcrypto";
 
-create type public.app_role as enum ('customer', 'technician', 'admin');
-create type public.verification_status as enum ('pending', 'verified', 'rejected', 'inactive');
-create type public.service_approval_status as enum ('pending', 'approved', 'rejected');
-create type public.order_status as enum (
-  'waiting_confirmation',
-  'accepted',
-  'on_the_way',
-  'inspection',
-  'waiting_price_approval',
-  'in_progress',
-  'waiting_payment',
-  'completed',
-  'rejected',
-  'price_rejected'
-);
-create type public.payment_method as enum ('cash', 'bank_transfer');
-create type public.payment_status as enum ('unpaid', 'waiting_verification', 'paid', 'rejected');
-create type public.warranty_status as enum ('active', 'expired', 'claimed', 'void');
-create type public.notification_type as enum (
-  'technician_registered',
-  'technician_verified',
-  'service_approved',
-  'new_order',
-  'order_accepted',
-  'order_rejected',
-  'price_approval_requested',
-  'price_approved',
-  'work_completed',
-  'payment_paid'
-);
+do $$
+begin
+  if exists (select 1 from pg_type where typname = 'payment_status')
+    and not exists (
+      select 1
+      from pg_enum e
+      join pg_type t on t.oid = e.enumtypid
+      where t.typname = 'payment_status'
+        and e.enumlabel = 'unpaid'
+    )
+    and not exists (select 1 from pg_type where typname = 'legacy_payment_status') then
+    alter type public.payment_status rename to legacy_payment_status;
+  end if;
+
+  if not exists (select 1 from pg_type where typname = 'app_role') then
+    create type public.app_role as enum ('customer', 'technician', 'admin');
+  end if;
+  if not exists (select 1 from pg_type where typname = 'verification_status') then
+    create type public.verification_status as enum ('pending', 'verified', 'rejected', 'inactive');
+  end if;
+  if not exists (select 1 from pg_type where typname = 'service_approval_status') then
+    create type public.service_approval_status as enum ('pending', 'approved', 'rejected');
+  end if;
+  if not exists (select 1 from pg_type where typname = 'order_status') then
+    create type public.order_status as enum (
+      'waiting_confirmation',
+      'accepted',
+      'on_the_way',
+      'inspection',
+      'waiting_price_approval',
+      'in_progress',
+      'waiting_payment',
+      'completed',
+      'rejected',
+      'price_rejected'
+    );
+  end if;
+  if not exists (select 1 from pg_type where typname = 'payment_method') then
+    create type public.payment_method as enum ('cash', 'bank_transfer');
+  end if;
+  if not exists (select 1 from pg_type where typname = 'payment_status') then
+    create type public.payment_status as enum ('unpaid', 'waiting_verification', 'paid', 'rejected');
+  end if;
+  if not exists (select 1 from pg_type where typname = 'warranty_status') then
+    create type public.warranty_status as enum ('active', 'expired', 'claimed', 'void');
+  end if;
+  if not exists (select 1 from pg_type where typname = 'notification_type') then
+    create type public.notification_type as enum (
+      'technician_registered',
+      'technician_verified',
+      'service_approved',
+      'new_order',
+      'order_accepted',
+      'order_rejected',
+      'price_approval_requested',
+      'price_approved',
+      'work_completed',
+      'payment_paid'
+    );
+  end if;
+end $$;
+
+do $$
+declare
+  policy_record record;
+begin
+  for policy_record in
+    select schemaname, tablename, policyname
+    from pg_policies
+    where schemaname in ('public', 'storage')
+  loop
+    execute format(
+      'drop policy if exists %I on %I.%I',
+      policy_record.policyname,
+      policy_record.schemaname,
+      policy_record.tablename
+    );
+  end loop;
+
+  if exists (
+    select 1
+    from information_schema.tables
+    where table_schema = 'public'
+      and table_name = 'services'
+  ) and not exists (
+    select 1
+    from information_schema.columns
+    where table_schema = 'public'
+      and table_name = 'services'
+      and column_name = 'technician_id'
+  ) then
+    if not exists (
+      select 1
+      from information_schema.tables
+      where table_schema = 'public'
+        and table_name = 'legacy_services'
+    ) then
+      alter table public.services rename to legacy_services;
+    end if;
+  end if;
+
+  if exists (
+    select 1 from information_schema.tables
+    where table_schema = 'public' and table_name = 'payments'
+  ) and not exists (
+    select 1 from information_schema.columns
+    where table_schema = 'public' and table_name = 'payments' and column_name = 'order_id'
+  ) then
+    if not exists (
+      select 1 from information_schema.tables
+      where table_schema = 'public' and table_name = 'legacy_payments'
+    ) then
+      alter table public.payments rename to legacy_payments;
+    end if;
+  end if;
+
+  if exists (
+    select 1 from information_schema.tables
+    where table_schema = 'public' and table_name = 'reviews'
+  ) and not exists (
+    select 1 from information_schema.columns
+    where table_schema = 'public' and table_name = 'reviews' and column_name = 'order_id'
+  ) then
+    if not exists (
+      select 1 from information_schema.tables
+      where table_schema = 'public' and table_name = 'legacy_reviews'
+    ) then
+      alter table public.reviews rename to legacy_reviews;
+    end if;
+  end if;
+
+  if exists (
+    select 1 from information_schema.tables
+    where table_schema = 'public' and table_name = 'invoices'
+  ) and not exists (
+    select 1 from information_schema.columns
+    where table_schema = 'public' and table_name = 'invoices' and column_name = 'order_id'
+  ) then
+    if not exists (
+      select 1 from information_schema.tables
+      where table_schema = 'public' and table_name = 'legacy_invoices'
+    ) then
+      alter table public.invoices rename to legacy_invoices;
+    end if;
+  end if;
+
+  if exists (
+    select 1
+    from information_schema.tables
+    where table_schema = 'public'
+      and table_name = 'profiles'
+  ) then
+    alter table public.profiles add column if not exists email text not null default '';
+    alter table public.profiles add column if not exists profile_image_url text;
+    alter table public.profiles add column if not exists is_active boolean not null default true;
+    if exists (
+      select 1
+      from information_schema.columns
+      where table_schema = 'public'
+        and table_name = 'profiles'
+        and column_name = 'role'
+        and udt_name <> 'app_role'
+    ) then
+      alter table public.profiles
+        alter column role drop default;
+      alter table public.profiles
+        alter column role type public.app_role
+        using role::text::public.app_role;
+      alter table public.profiles
+        alter column role set default 'customer'::public.app_role;
+    end if;
+    if exists (
+      select 1
+      from information_schema.columns
+      where table_schema = 'public'
+        and table_name = 'profiles'
+        and column_name = 'avatar_url'
+    ) then
+      update public.profiles
+      set profile_image_url = coalesce(profile_image_url, avatar_url)
+      where profile_image_url is null;
+    end if;
+  end if;
+end $$;
 
 create or replace function public.set_updated_at()
 returns trigger
@@ -44,7 +198,7 @@ begin
 end;
 $$;
 
-create table public.profiles (
+create table if not exists public.profiles (
   id uuid primary key references auth.users(id) on delete cascade,
   email text not null,
   full_name text not null,
@@ -58,7 +212,7 @@ create table public.profiles (
   constraint profiles_full_name_not_empty check (length(trim(full_name)) > 0)
 );
 
-create table public.technician_profiles (
+create table if not exists public.technician_profiles (
   id uuid primary key default gen_random_uuid(),
   user_id uuid not null unique references public.profiles(id) on delete cascade,
   address text not null,
@@ -73,7 +227,7 @@ create table public.technician_profiles (
   updated_at timestamptz not null default now()
 );
 
-create table public.technician_documents (
+create table if not exists public.technician_documents (
   id uuid primary key default gen_random_uuid(),
   technician_id uuid not null references public.technician_profiles(id) on delete cascade,
   document_type text not null,
@@ -82,7 +236,7 @@ create table public.technician_documents (
   constraint technician_documents_type_not_empty check (length(trim(document_type)) > 0)
 );
 
-create table public.categories (
+create table if not exists public.categories (
   id uuid primary key default gen_random_uuid(),
   name text not null unique,
   description text,
@@ -92,7 +246,22 @@ create table public.categories (
   updated_at timestamptz not null default now()
 );
 
-create table public.services (
+do $$
+begin
+  if exists (
+    select 1
+    from information_schema.tables
+    where table_schema = 'public'
+      and table_name = 'legacy_services'
+  ) then
+    insert into public.categories (name, description, icon_url, is_active, created_at, updated_at)
+    select name, description, icon_url, is_active, created_at, updated_at
+    from public.legacy_services
+    on conflict (name) do nothing;
+  end if;
+end $$;
+
+create table if not exists public.services (
   id uuid primary key default gen_random_uuid(),
   technician_id uuid not null references public.technician_profiles(id) on delete cascade,
   category_id uuid not null references public.categories(id) on delete restrict,
@@ -110,14 +279,14 @@ create table public.services (
   constraint services_name_not_empty check (length(trim(name)) > 0)
 );
 
-create table public.service_images (
+create table if not exists public.service_images (
   id uuid primary key default gen_random_uuid(),
   service_id uuid not null references public.services(id) on delete cascade,
   image_url text not null,
   created_at timestamptz not null default now()
 );
 
-create table public.technician_schedules (
+create table if not exists public.technician_schedules (
   id uuid primary key default gen_random_uuid(),
   technician_id uuid not null references public.technician_profiles(id) on delete cascade,
   day_of_week smallint not null,
@@ -130,7 +299,7 @@ create table public.technician_schedules (
   constraint technician_schedules_valid_time check (start_time < end_time)
 );
 
-create table public.customer_addresses (
+create table if not exists public.customer_addresses (
   id uuid primary key default gen_random_uuid(),
   customer_id uuid not null references public.profiles(id) on delete cascade,
   label text not null,
@@ -148,7 +317,7 @@ create table public.customer_addresses (
   updated_at timestamptz not null default now()
 );
 
-create table public.orders (
+create table if not exists public.orders (
   id uuid primary key default gen_random_uuid(),
   order_number text not null unique,
   customer_id uuid not null references public.profiles(id) on delete restrict,
@@ -170,7 +339,7 @@ create table public.orders (
   constraint orders_commission_percentage_range check (commission_percentage between 0 and 100)
 );
 
-create table public.order_items (
+create table if not exists public.order_items (
   id uuid primary key default gen_random_uuid(),
   order_id uuid not null references public.orders(id) on delete cascade,
   service_id uuid references public.services(id) on delete set null,
@@ -182,7 +351,7 @@ create table public.order_items (
   constraint order_items_final_price_non_negative check (final_price >= 0)
 );
 
-create table public.order_attachments (
+create table if not exists public.order_attachments (
   id uuid primary key default gen_random_uuid(),
   order_id uuid not null references public.orders(id) on delete cascade,
   file_url text not null,
@@ -190,7 +359,7 @@ create table public.order_attachments (
   created_at timestamptz not null default now()
 );
 
-create table public.diagnoses (
+create table if not exists public.diagnoses (
   id uuid primary key default gen_random_uuid(),
   order_id uuid not null unique references public.orders(id) on delete cascade,
   technician_id uuid not null references public.technician_profiles(id) on delete restrict,
@@ -205,7 +374,7 @@ create table public.diagnoses (
   constraint diagnoses_sparepart_cost_non_negative check (sparepart_cost >= 0)
 );
 
-create table public.spareparts (
+create table if not exists public.spareparts (
   id uuid primary key default gen_random_uuid(),
   name text not null unique,
   description text,
@@ -213,7 +382,7 @@ create table public.spareparts (
   updated_at timestamptz not null default now()
 );
 
-create table public.order_spareparts (
+create table if not exists public.order_spareparts (
   id uuid primary key default gen_random_uuid(),
   order_id uuid not null references public.orders(id) on delete cascade,
   sparepart_id uuid references public.spareparts(id) on delete set null,
@@ -226,7 +395,7 @@ create table public.order_spareparts (
   constraint order_spareparts_unit_price_non_negative check (unit_price >= 0)
 );
 
-create table public.payments (
+create table if not exists public.payments (
   id uuid primary key default gen_random_uuid(),
   order_id uuid not null unique references public.orders(id) on delete cascade,
   payment_method public.payment_method not null,
@@ -239,7 +408,7 @@ create table public.payments (
   constraint payments_amount_non_negative check (amount >= 0)
 );
 
-create table public.reviews (
+create table if not exists public.reviews (
   id uuid primary key default gen_random_uuid(),
   order_id uuid not null unique references public.orders(id) on delete cascade,
   customer_id uuid not null references public.profiles(id) on delete cascade,
@@ -251,7 +420,7 @@ create table public.reviews (
   constraint reviews_rating_range check (rating between 1 and 5)
 );
 
-create table public.warranties (
+create table if not exists public.warranties (
   id uuid primary key default gen_random_uuid(),
   order_id uuid not null unique references public.orders(id) on delete cascade,
   warranty_number text not null unique,
@@ -262,7 +431,7 @@ create table public.warranties (
   constraint warranties_valid_period check (start_date <= end_date)
 );
 
-create table public.invoices (
+create table if not exists public.invoices (
   id uuid primary key default gen_random_uuid(),
   order_id uuid not null unique references public.orders(id) on delete cascade,
   invoice_number text not null unique,
@@ -273,7 +442,7 @@ create table public.invoices (
   constraint invoices_total_amount_non_negative check (total_amount >= 0)
 );
 
-create table public.notifications (
+create table if not exists public.notifications (
   id uuid primary key default gen_random_uuid(),
   user_id uuid not null references public.profiles(id) on delete cascade,
   type public.notification_type not null,
@@ -283,35 +452,50 @@ create table public.notifications (
   created_at timestamptz not null default now()
 );
 
-create table public.app_settings (
+create table if not exists public.app_settings (
   key text primary key,
   value jsonb not null,
   description text,
   updated_at timestamptz not null default now()
 );
 
-create index technician_profiles_user_id_idx on public.technician_profiles(user_id);
-create index technician_profiles_status_idx on public.technician_profiles(verification_status);
-create index services_technician_id_idx on public.services(technician_id);
-create index services_category_id_idx on public.services(category_id);
-create index services_approval_active_idx on public.services(approval_status, is_active);
-create index customer_addresses_customer_id_idx on public.customer_addresses(customer_id);
-create index orders_customer_id_idx on public.orders(customer_id);
-create index orders_technician_id_idx on public.orders(technician_id);
-create index orders_status_idx on public.orders(status);
-create index notifications_user_read_idx on public.notifications(user_id, is_read);
+create index if not exists technician_profiles_user_id_idx on public.technician_profiles(user_id);
+create index if not exists technician_profiles_status_idx on public.technician_profiles(verification_status);
+create index if not exists services_technician_id_idx on public.services(technician_id);
+create index if not exists services_category_id_idx on public.services(category_id);
+create index if not exists services_approval_active_idx on public.services(approval_status, is_active);
+create index if not exists customer_addresses_customer_id_idx on public.customer_addresses(customer_id);
+create index if not exists orders_customer_id_idx on public.orders(customer_id);
+create index if not exists orders_technician_id_idx on public.orders(technician_id);
+create index if not exists orders_status_idx on public.orders(status);
+create index if not exists notifications_user_read_idx on public.notifications(user_id, is_read);
 
+drop trigger if exists profiles_set_updated_at on public.profiles;
 create trigger profiles_set_updated_at before update on public.profiles for each row execute function public.set_updated_at();
+drop trigger if exists technician_profiles_set_updated_at on public.technician_profiles;
 create trigger technician_profiles_set_updated_at before update on public.technician_profiles for each row execute function public.set_updated_at();
+drop trigger if exists categories_set_updated_at on public.categories;
 create trigger categories_set_updated_at before update on public.categories for each row execute function public.set_updated_at();
+drop trigger if exists services_set_updated_at on public.services;
 create trigger services_set_updated_at before update on public.services for each row execute function public.set_updated_at();
+drop trigger if exists technician_schedules_set_updated_at on public.technician_schedules;
 create trigger technician_schedules_set_updated_at before update on public.technician_schedules for each row execute function public.set_updated_at();
+drop trigger if exists customer_addresses_set_updated_at on public.customer_addresses;
 create trigger customer_addresses_set_updated_at before update on public.customer_addresses for each row execute function public.set_updated_at();
+drop trigger if exists orders_set_updated_at on public.orders;
 create trigger orders_set_updated_at before update on public.orders for each row execute function public.set_updated_at();
+drop trigger if exists diagnoses_set_updated_at on public.diagnoses;
 create trigger diagnoses_set_updated_at before update on public.diagnoses for each row execute function public.set_updated_at();
+drop trigger if exists spareparts_set_updated_at on public.spareparts;
 create trigger spareparts_set_updated_at before update on public.spareparts for each row execute function public.set_updated_at();
+drop trigger if exists payments_set_updated_at on public.payments;
 create trigger payments_set_updated_at before update on public.payments for each row execute function public.set_updated_at();
+drop trigger if exists app_settings_set_updated_at on public.app_settings;
 create trigger app_settings_set_updated_at before update on public.app_settings for each row execute function public.set_updated_at();
+
+drop function if exists public.current_user_role() cascade;
+drop function if exists public.is_admin() cascade;
+drop function if exists public.current_technician_profile_id() cascade;
 
 create or replace function public.current_user_role()
 returns public.app_role
@@ -375,6 +559,7 @@ begin
 end;
 $$;
 
+drop trigger if exists orders_apply_totals on public.orders;
 create trigger orders_apply_totals
 before insert or update of final_total, commission_percentage on public.orders
 for each row execute function public.apply_order_totals();
@@ -407,6 +592,7 @@ begin
 end;
 $$;
 
+drop trigger if exists on_auth_user_created on auth.users;
 create trigger on_auth_user_created
 after insert on auth.users
 for each row execute function public.create_profile_for_new_user();

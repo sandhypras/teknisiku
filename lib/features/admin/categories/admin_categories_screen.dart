@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:image_picker/image_picker.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../admin_shell.dart';
@@ -42,7 +43,7 @@ class _AdminCategoriesScreenState extends State<AdminCategoriesScreen> {
   Future<List<Map<String, dynamic>>> _fetch() async {
     final data = await Supabase.instance.client
         .from('categories')
-        .select('id, name, description, is_active, created_at')
+        .select('id, name, description, icon_url, is_active, created_at')
         .order('name');
     return List<Map<String, dynamic>>.from(data);
   }
@@ -52,10 +53,34 @@ class _AdminCategoriesScreenState extends State<AdminCategoriesScreen> {
         .from('categories')
         .update({'is_active': !current})
         .eq('id', id);
-    setState(() => _future = _fetch());
+    setState(() {
+      _future = _fetch();
+    });
+  }
+
+  String? _categoryImageUrl(String? path) {
+    return _categoryPublicUrl(path);
+  }
+
+  Future<String> _uploadCategoryImage(XFile file) async {
+    final extension = _extensionFor(file.name, file.mimeType);
+    final path =
+        'categories/${DateTime.now().millisecondsSinceEpoch}$extension';
+    await Supabase.instance.client.storage
+        .from('category-images')
+        .uploadBinary(
+          path,
+          await file.readAsBytes(),
+          fileOptions: FileOptions(
+            contentType: file.mimeType ?? _contentTypeFor(extension),
+            upsert: true,
+          ),
+        );
+    return 'category-images/$path';
   }
 
   void _showAddEditDialog({Map<String, dynamic>? existing}) {
+    final isEdit = existing != null;
     final nameCtrl = TextEditingController(
       text: existing?['name'] as String? ?? '',
     );
@@ -63,146 +88,458 @@ class _AdminCategoriesScreenState extends State<AdminCategoriesScreen> {
       text: existing?['description'] as String? ?? '',
     );
     bool isActive = existing?['is_active'] as bool? ?? true;
+    String? iconUrl = existing?['icon_url'] as String?;
+    bool uploading = false;
+    bool nameTouched = false;
 
     showDialog(
       context: context,
       builder: (ctx) => StatefulBuilder(
-        builder: (ctx, setS) => AlertDialog(
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(16),
-          ),
-          title: Row(
-            children: [
-              Container(
-                width: 36,
-                height: 36,
-                decoration: BoxDecoration(
-                  color: AppColors.iconBg,
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: const Icon(
-                  Icons.category_outlined,
-                  color: AppColors.primaryBlue,
-                  size: 20,
-                ),
-              ),
-              const SizedBox(width: 10),
-              Text(
-                existing == null ? 'Tambah Kategori' : 'Edit Kategori',
-                style: const TextStyle(
-                  fontSize: 16,
-                  fontWeight: FontWeight.bold,
-                  color: AppColors.darkBlue,
-                ),
-              ),
-            ],
-          ),
-          content: SizedBox(
-            width: 380,
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                _InputField(
-                  controller: nameCtrl,
-                  label: 'Nama Kategori',
-                  hint: 'Contoh: Komputer',
-                  icon: Icons.label_outline,
-                ),
-                const SizedBox(height: 14),
-                _InputField(
-                  controller: descCtrl,
-                  label: 'Deskripsi',
-                  hint: 'Deskripsi singkat kategori',
-                  icon: Icons.notes_outlined,
-                  maxLines: 3,
-                ),
-                const SizedBox(height: 14),
-                Row(
-                  children: [
-                    Switch(
-                      value: isActive,
-                      activeThumbColor: AppColors.primaryBlue,
-                      activeTrackColor: AppColors.softBlue,
-                      onChanged: (v) => setS(() => isActive = v),
-                    ),
-                    const SizedBox(width: 8),
-                    Text(
-                      isActive ? 'Aktif' : 'Nonaktif',
-                      style: TextStyle(
-                        color: isActive
-                            ? AppColors.primaryBlue
-                            : AppColors.textSecondary,
-                        fontWeight: FontWeight.w600,
-                        fontSize: 13,
+        builder: (ctx, setS) {
+          final nameError = nameTouched && nameCtrl.text.trim().isEmpty;
+          return Dialog(
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(20),
+            ),
+            insetPadding: const EdgeInsets.symmetric(
+              horizontal: 24,
+              vertical: 24,
+            ),
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 440),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  // ── Dialog header ──
+                  Container(
+                    padding: const EdgeInsets.fromLTRB(24, 22, 18, 20),
+                    decoration: BoxDecoration(
+                      gradient: AppColors.heroGradient,
+                      borderRadius: const BorderRadius.vertical(
+                        top: Radius.circular(20),
                       ),
                     ),
-                  ],
-                ),
-              ],
-            ),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(ctx),
-              child: const Text(
-                'Batal',
-                style: TextStyle(color: AppColors.textSecondary),
+                    child: Row(
+                      children: [
+                        Container(
+                          width: 44,
+                          height: 44,
+                          decoration: BoxDecoration(
+                            color: Colors.white.withValues(alpha: 0.18),
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          child: Icon(
+                            isEdit
+                                ? Icons.edit_outlined
+                                : Icons.category_outlined,
+                            color: Colors.white,
+                            size: 22,
+                          ),
+                        ),
+                        const SizedBox(width: 14),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                isEdit ? 'Edit Kategori' : 'Tambah Kategori',
+                                style: const TextStyle(
+                                  fontSize: 17,
+                                  fontWeight: FontWeight.w800,
+                                  color: Colors.white,
+                                  letterSpacing: -0.2,
+                                ),
+                              ),
+                              const SizedBox(height: 2),
+                              Text(
+                                isEdit
+                                    ? 'Perbarui detail kategori layanan'
+                                    : 'Buat kategori layanan baru',
+                                style: TextStyle(
+                                  fontSize: 12.5,
+                                  color: Colors.white.withValues(alpha: 0.85),
+                                  fontWeight: FontWeight.w500,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        InkWell(
+                          onTap: () => Navigator.pop(ctx),
+                          borderRadius: BorderRadius.circular(8),
+                          child: Container(
+                            padding: const EdgeInsets.all(6),
+                            decoration: BoxDecoration(
+                              color: Colors.white.withValues(alpha: 0.14),
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            child: const Icon(
+                              Icons.close_rounded,
+                              color: Colors.white,
+                              size: 18,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+
+                  // ── Body ──
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(24, 22, 24, 8),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        // ── Icon preview / upload ──
+                        Center(
+                          child: Column(
+                            children: [
+                              Stack(
+                                clipBehavior: Clip.none,
+                                children: [
+                                  Container(
+                                    width: 92,
+                                    height: 92,
+                                    decoration: BoxDecoration(
+                                      color: AppColors.iconBg,
+                                      borderRadius: BorderRadius.circular(22),
+                                      border: Border.all(
+                                        color:
+                                            _categoryImageUrl(iconUrl) == null
+                                            ? AppColors.border
+                                            : AppColors.primaryBlue.withValues(
+                                                alpha: 0.25,
+                                              ),
+                                        width: 1.4,
+                                      ),
+                                    ),
+                                    clipBehavior: Clip.antiAlias,
+                                    child: uploading
+                                        ? const Center(
+                                            child: SizedBox(
+                                              width: 22,
+                                              height: 22,
+                                              child: CircularProgressIndicator(
+                                                strokeWidth: 2.4,
+                                                color: AppColors.primaryBlue,
+                                              ),
+                                            ),
+                                          )
+                                        : _categoryImageUrl(iconUrl) == null
+                                        ? const Icon(
+                                            Icons.add_photo_alternate_outlined,
+                                            color: AppColors.primaryBlue,
+                                            size: 30,
+                                          )
+                                        : Image.network(
+                                            _categoryImageUrl(iconUrl)!,
+                                            fit: BoxFit.contain,
+                                            errorBuilder: (_, _, _) =>
+                                                const Icon(
+                                                  Icons.broken_image_outlined,
+                                                  color:
+                                                      AppColors.textSecondary,
+                                                ),
+                                          ),
+                                  ),
+                                  if (iconUrl != null && !uploading)
+                                    Positioned(
+                                      right: -6,
+                                      top: -6,
+                                      child: InkWell(
+                                        onTap: () => setS(() => iconUrl = null),
+                                        borderRadius: BorderRadius.circular(20),
+                                        child: Container(
+                                          padding: const EdgeInsets.all(5),
+                                          decoration: BoxDecoration(
+                                            color: AppColors.error,
+                                            shape: BoxShape.circle,
+                                            border: Border.all(
+                                              color: Colors.white,
+                                              width: 2,
+                                            ),
+                                          ),
+                                          child: const Icon(
+                                            Icons.close_rounded,
+                                            size: 12,
+                                            color: Colors.white,
+                                          ),
+                                        ),
+                                      ),
+                                    ),
+                                ],
+                              ),
+                              const SizedBox(height: 10),
+                              TextButton.icon(
+                                onPressed: uploading
+                                    ? null
+                                    : () async {
+                                        final file = await ImagePicker()
+                                            .pickImage(
+                                              source: ImageSource.gallery,
+                                              imageQuality: 86,
+                                              maxWidth: 1200,
+                                            );
+                                        if (file == null) return;
+                                        setS(() => uploading = true);
+                                        try {
+                                          final uploaded =
+                                              await _uploadCategoryImage(file);
+                                          setS(() => iconUrl = uploaded);
+                                          if (existing != null) {
+                                            await Supabase.instance.client
+                                                .from('categories')
+                                                .update({'icon_url': uploaded})
+                                                .eq(
+                                                  'id',
+                                                  existing['id'] as String,
+                                                );
+                                            if (mounted) {
+                                              setState(() {
+                                                _future = _fetch();
+                                              });
+                                            }
+                                          }
+                                        } finally {
+                                          setS(() => uploading = false);
+                                        }
+                                      },
+                                icon: Icon(
+                                  iconUrl == null
+                                      ? Icons.upload_rounded
+                                      : Icons.swap_horiz_rounded,
+                                  size: 16,
+                                ),
+                                label: Text(
+                                  uploading
+                                      ? 'Mengupload...'
+                                      : iconUrl == null
+                                      ? 'Pilih icon kategori'
+                                      : 'Ganti icon',
+                                  style: const TextStyle(
+                                    fontSize: 12.5,
+                                    fontWeight: FontWeight.w700,
+                                  ),
+                                ),
+                                style: TextButton.styleFrom(
+                                  foregroundColor: AppColors.primaryBlue,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        const SizedBox(height: 6),
+
+                        // ── Nama ──
+                        _InputField(
+                          controller: nameCtrl,
+                          label: 'Nama Kategori',
+                          hint: 'Contoh: Komputer',
+                          icon: Icons.label_outline,
+                          errorText: nameError
+                              ? 'Nama kategori wajib diisi'
+                              : null,
+                          onChanged: (_) {
+                            if (!nameTouched) setS(() => nameTouched = true);
+                            setS(() {});
+                          },
+                        ),
+                        const SizedBox(height: 14),
+
+                        // ── Deskripsi ──
+                        _InputField(
+                          controller: descCtrl,
+                          label: 'Deskripsi',
+                          hint: 'Deskripsi singkat kategori (opsional)',
+                          icon: Icons.notes_outlined,
+                          maxLines: 3,
+                        ),
+                        const SizedBox(height: 16),
+
+                        // ── Status switch ──
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 14,
+                            vertical: 12,
+                          ),
+                          decoration: BoxDecoration(
+                            color: isActive
+                                ? AppColors.success.withValues(alpha: 0.06)
+                                : AppColors.bgPage,
+                            borderRadius: BorderRadius.circular(12),
+                            border: Border.all(
+                              color: isActive
+                                  ? AppColors.success.withValues(alpha: 0.25)
+                                  : AppColors.border,
+                            ),
+                          ),
+                          child: Row(
+                            children: [
+                              Icon(
+                                isActive
+                                    ? Icons.check_circle_outline_rounded
+                                    : Icons.pause_circle_outline_rounded,
+                                size: 20,
+                                color: isActive
+                                    ? AppColors.success
+                                    : AppColors.textSecondary,
+                              ),
+                              const SizedBox(width: 10),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      isActive
+                                          ? 'Kategori aktif'
+                                          : 'Kategori nonaktif',
+                                      style: TextStyle(
+                                        fontSize: 13,
+                                        fontWeight: FontWeight.w700,
+                                        color: isActive
+                                            ? AppColors.darkBlue
+                                            : AppColors.textSecondary,
+                                      ),
+                                    ),
+                                    Text(
+                                      isActive
+                                          ? 'Tampil di daftar layanan customer'
+                                          : 'Tersembunyi dari customer',
+                                      style: const TextStyle(
+                                        fontSize: 11,
+                                        color: AppColors.textSecondary,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                              Switch(
+                                value: isActive,
+                                activeThumbColor: AppColors.primaryBlue,
+                                activeTrackColor: AppColors.softBlue,
+                                onChanged: (v) => setS(() => isActive = v),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+
+                  // ── Actions ──
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(24, 8, 24, 22),
+                    child: Row(
+                      children: [
+                        Expanded(
+                          child: OutlinedButton(
+                            onPressed: () => Navigator.pop(ctx),
+                            style: OutlinedButton.styleFrom(
+                              foregroundColor: AppColors.textSecondary,
+                              side: const BorderSide(color: AppColors.border),
+                              padding: const EdgeInsets.symmetric(vertical: 13),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(10),
+                              ),
+                            ),
+                            child: const Text(
+                              'Batal',
+                              style: TextStyle(fontWeight: FontWeight.w700),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          flex: 2,
+                          child: DecoratedBox(
+                            decoration: BoxDecoration(
+                              gradient: AppColors.heroGradient,
+                              borderRadius: BorderRadius.circular(10),
+                              boxShadow: [
+                                BoxShadow(
+                                  color: AppColors.primaryBlue.withValues(
+                                    alpha: 0.30,
+                                  ),
+                                  blurRadius: 12,
+                                  offset: const Offset(0, 5),
+                                ),
+                              ],
+                            ),
+                            child: ElevatedButton.icon(
+                              onPressed: () async {
+                                final name = nameCtrl.text.trim();
+                                if (name.isEmpty) {
+                                  setS(() => nameTouched = true);
+                                  return;
+                                }
+                                Navigator.pop(ctx);
+                                if (existing == null) {
+                                  await Supabase.instance.client
+                                      .from('categories')
+                                      .insert({
+                                        'name': name,
+                                        'description':
+                                            descCtrl.text.trim().isEmpty
+                                            ? null
+                                            : descCtrl.text.trim(),
+                                        'icon_url': iconUrl,
+                                        'is_active': isActive,
+                                      });
+                                } else {
+                                  await Supabase.instance.client
+                                      .from('categories')
+                                      .update({
+                                        'name': name,
+                                        'description':
+                                            descCtrl.text.trim().isEmpty
+                                            ? null
+                                            : descCtrl.text.trim(),
+                                        'icon_url': iconUrl,
+                                        'is_active': isActive,
+                                      })
+                                      .eq('id', existing['id'] as String);
+                                }
+                                setState(() {
+                                  _future = _fetch();
+                                });
+                              },
+                              icon: Icon(
+                                isEdit
+                                    ? Icons.save_outlined
+                                    : Icons.add_rounded,
+                                size: 18,
+                                color: Colors.white,
+                              ),
+                              label: Text(
+                                isEdit ? 'Update Kategori' : 'Simpan Kategori',
+                                style: const TextStyle(
+                                  color: Colors.white,
+                                  fontWeight: FontWeight.w700,
+                                  fontSize: 13.5,
+                                ),
+                              ),
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: Colors.transparent,
+                                shadowColor: Colors.transparent,
+                                padding: const EdgeInsets.symmetric(
+                                  vertical: 13,
+                                ),
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(10),
+                                ),
+                              ),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
               ),
             ),
-            DecoratedBox(
-              decoration: BoxDecoration(
-                gradient: AppColors.heroGradient,
-                borderRadius: BorderRadius.circular(8),
-              ),
-              child: ElevatedButton(
-                onPressed: () async {
-                  final name = nameCtrl.text.trim();
-                  if (name.isEmpty) return;
-                  Navigator.pop(ctx);
-                  if (existing == null) {
-                    await Supabase.instance.client.from('categories').insert({
-                      'name': name,
-                      'description': descCtrl.text.trim().isEmpty
-                          ? null
-                          : descCtrl.text.trim(),
-                      'is_active': isActive,
-                    });
-                  } else {
-                    await Supabase.instance.client
-                        .from('categories')
-                        .update({
-                          'name': name,
-                          'description': descCtrl.text.trim().isEmpty
-                              ? null
-                              : descCtrl.text.trim(),
-                          'is_active': isActive,
-                        })
-                        .eq('id', existing['id'] as String);
-                  }
-                  setState(() => _future = _fetch());
-                },
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: Colors.transparent,
-                  shadowColor: Colors.transparent,
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 20,
-                    vertical: 10,
-                  ),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                ),
-                child: Text(
-                  existing == null ? 'Simpan' : 'Update',
-                  style: const TextStyle(
-                    color: Colors.white,
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-              ),
-            ),
-          ],
-        ),
+          );
+        },
       ),
     );
   }
@@ -210,45 +547,124 @@ class _AdminCategoriesScreenState extends State<AdminCategoriesScreen> {
   void _confirmDelete(String id, String name) {
     showDialog(
       context: context,
-      builder: (_) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-        title: const Text(
-          'Hapus Kategori',
-          style: TextStyle(
-            fontWeight: FontWeight.bold,
-            color: AppColors.darkBlue,
-          ),
-        ),
-        content: Text(
-          'Yakin ingin menghapus kategori "$name"?\nLayanan yang terkait tidak dapat dihapus.',
-          style: const TextStyle(fontSize: 13, color: AppColors.textSecondary),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text(
-              'Batal',
-              style: TextStyle(color: AppColors.textSecondary),
+      builder: (_) => Dialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 380),
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(28, 28, 28, 22),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Container(
+                  width: 64,
+                  height: 64,
+                  decoration: BoxDecoration(
+                    color: AppColors.error.withValues(alpha: 0.10),
+                    shape: BoxShape.circle,
+                  ),
+                  child: const Icon(
+                    Icons.delete_outline_rounded,
+                    size: 32,
+                    color: AppColors.error,
+                  ),
+                ),
+                const SizedBox(height: 18),
+                const Text(
+                  'Hapus Kategori?',
+                  style: TextStyle(
+                    fontSize: 17,
+                    fontWeight: FontWeight.w800,
+                    color: AppColors.darkBlue,
+                  ),
+                ),
+                const SizedBox(height: 10),
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 14,
+                    vertical: 9,
+                  ),
+                  decoration: BoxDecoration(
+                    color: AppColors.bgPage,
+                    borderRadius: BorderRadius.circular(10),
+                    border: Border.all(color: AppColors.border),
+                  ),
+                  child: Text(
+                    name,
+                    style: const TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w700,
+                      color: AppColors.darkBlue,
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 14),
+                const Text(
+                  'Tindakan ini tidak dapat dibatalkan. Layanan yang masih terkait dengan kategori ini tidak dapat dihapus.',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    fontSize: 12.5,
+                    color: AppColors.textSecondary,
+                    height: 1.4,
+                  ),
+                ),
+                const SizedBox(height: 22),
+                Row(
+                  children: [
+                    Expanded(
+                      child: OutlinedButton(
+                        onPressed: () => Navigator.pop(context),
+                        style: OutlinedButton.styleFrom(
+                          foregroundColor: AppColors.textSecondary,
+                          side: const BorderSide(color: AppColors.border),
+                          padding: const EdgeInsets.symmetric(vertical: 13),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(10),
+                          ),
+                        ),
+                        child: const Text(
+                          'Batal',
+                          style: TextStyle(fontWeight: FontWeight.w700),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: ElevatedButton.icon(
+                        onPressed: () async {
+                          Navigator.pop(context);
+                          await Supabase.instance.client
+                              .from('categories')
+                              .delete()
+                              .eq('id', id);
+                          setState(() {
+                            _future = _fetch();
+                          });
+                        },
+                        icon: const Icon(
+                          Icons.delete_outline_rounded,
+                          size: 17,
+                        ),
+                        label: const Text(
+                          'Hapus',
+                          style: TextStyle(fontWeight: FontWeight.w700),
+                        ),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: AppColors.error,
+                          foregroundColor: Colors.white,
+                          padding: const EdgeInsets.symmetric(vertical: 13),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(10),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
             ),
           ),
-          ElevatedButton(
-            onPressed: () async {
-              Navigator.pop(context);
-              await Supabase.instance.client
-                  .from('categories')
-                  .delete()
-                  .eq('id', id);
-              setState(() => _future = _fetch());
-            },
-            style: ElevatedButton.styleFrom(
-              backgroundColor: AppColors.error,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(8),
-              ),
-            ),
-            child: const Text('Hapus', style: TextStyle(color: Colors.white)),
-          ),
-        ],
+        ),
       ),
     );
   }
@@ -291,7 +707,9 @@ class _AdminCategoriesScreenState extends State<AdminCategoriesScreen> {
                 _OutlineButton(
                   icon: Icons.refresh_outlined,
                   label: 'Refresh',
-                  onPressed: () => setState(() => _future = _fetch()),
+                  onPressed: () => setState(() {
+                    _future = _fetch();
+                  }),
                 ),
                 const SizedBox(width: 10),
                 _GradientButton(
@@ -371,7 +789,9 @@ class _AdminCategoriesScreenState extends State<AdminCategoriesScreen> {
                         _GradientButton(
                           icon: Icons.refresh_outlined,
                           label: 'Coba lagi',
-                          onPressed: () => setState(() => _future = _fetch()),
+                          onPressed: () => setState(() {
+                            _future = _fetch();
+                          }),
                         ),
                       ],
                     ),
@@ -457,6 +877,7 @@ class _CategoryCardState extends State<_CategoryCard> {
     final isActive = widget.data['is_active'] as bool? ?? true;
     final name = widget.data['name'] as String? ?? '-';
     final desc = widget.data['description'] as String? ?? '';
+    final imageUrl = _categoryPublicUrl(widget.data['icon_url'] as String?);
 
     return MouseRegion(
       onEnter: (_) => setState(() => _hovered = true),
@@ -497,7 +918,18 @@ class _CategoryCardState extends State<_CategoryCard> {
                     color: widget.accentColor.withValues(alpha: 0.2),
                   ),
                 ),
-                child: Icon(widget.icon, color: widget.accentColor, size: 26),
+                clipBehavior: Clip.antiAlias,
+                child: imageUrl == null
+                    ? Icon(widget.icon, color: widget.accentColor, size: 26)
+                    : Padding(
+                        padding: const EdgeInsets.all(7),
+                        child: Image.network(
+                          imageUrl,
+                          fit: BoxFit.contain,
+                          errorBuilder: (_, _, _) =>
+                              Icon(widget.icon, color: widget.accentColor),
+                        ),
+                      ),
               ),
               const SizedBox(width: 16),
 
@@ -639,22 +1071,28 @@ class _InputField extends StatelessWidget {
     required this.hint,
     required this.icon,
     this.maxLines = 1,
+    this.errorText,
+    this.onChanged,
   });
   final TextEditingController controller;
   final String label;
   final String hint;
   final IconData icon;
   final int maxLines;
+  final String? errorText;
+  final ValueChanged<String>? onChanged;
 
   @override
   Widget build(BuildContext context) {
     return TextField(
       controller: controller,
       maxLines: maxLines,
+      onChanged: onChanged,
       style: const TextStyle(fontSize: 13, color: AppColors.textPrimary),
       decoration: InputDecoration(
         labelText: label,
         hintText: hint,
+        errorText: errorText,
         prefixIcon: Icon(icon, size: 18, color: AppColors.primaryBlue),
         labelStyle: const TextStyle(
           fontSize: 13,
@@ -680,6 +1118,10 @@ class _InputField extends StatelessWidget {
             color: AppColors.primaryBlue,
             width: 1.5,
           ),
+        ),
+        errorBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(10),
+          borderSide: const BorderSide(color: AppColors.error),
         ),
         contentPadding: const EdgeInsets.symmetric(
           horizontal: 14,
@@ -816,4 +1258,53 @@ class _MiniStatChip extends StatelessWidget {
       ),
     );
   }
+}
+
+String? _categoryPublicUrl(String? path) {
+  if (path == null || path.trim().isEmpty) return null;
+  final value = path.trim();
+  if (value.startsWith('http')) return value;
+
+  const supportedBuckets = [
+    'category-images',
+    'service-images',
+    'profile-images',
+  ];
+  var bucket = 'category-images';
+  var objectPath = value;
+  for (final candidate in supportedBuckets) {
+    final prefix = '$candidate/';
+    if (value.startsWith(prefix)) {
+      bucket = candidate;
+      objectPath = value.substring(prefix.length);
+      break;
+    }
+  }
+  if (objectPath.isEmpty) return null;
+
+  return Supabase.instance.client.storage.from(bucket).getPublicUrl(objectPath);
+}
+
+String _extensionFor(String fileName, String? mimeType) {
+  final lower = fileName.toLowerCase();
+  final dot = lower.lastIndexOf('.');
+  if (dot >= 0 && dot < lower.length - 1) {
+    final extension = lower.substring(dot);
+    if (['.jpg', '.jpeg', '.png', '.webp'].contains(extension)) {
+      return extension;
+    }
+  }
+  return switch (mimeType) {
+    'image/png' => '.png',
+    'image/webp' => '.webp',
+    _ => '.jpg',
+  };
+}
+
+String _contentTypeFor(String extension) {
+  return switch (extension) {
+    '.png' => 'image/png',
+    '.webp' => 'image/webp',
+    _ => 'image/jpeg',
+  };
 }

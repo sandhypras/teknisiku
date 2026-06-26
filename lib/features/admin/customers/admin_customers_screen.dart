@@ -61,7 +61,228 @@ class _AdminCustomersScreenState extends State<AdminCustomersScreen> {
         .from('profiles')
         .update({'is_active': !currentActive})
         .eq('id', userId);
-    setState(() => _future = _fetch());
+    setState(() {
+      _future = _fetch();
+    });
+  }
+
+  Future<void> _updateCustomer(
+    String id, {
+    required String fullName,
+    required String email,
+    required String phone,
+    required bool isActive,
+  }) async {
+    await Supabase.instance.client
+        .from('profiles')
+        .update({
+          'full_name': fullName,
+          'email': email,
+          'phone': phone.trim().isEmpty ? null : phone.trim(),
+          'is_active': isActive,
+        })
+        .eq('id', id);
+    setState(() {
+      _future = _fetch();
+    });
+  }
+
+  Future<void> _deleteCustomer(String id) async {
+    await Supabase.instance.client.from('profiles').delete().eq('id', id);
+    setState(() {
+      _future = _fetch();
+    });
+  }
+
+  Future<Map<String, dynamic>> _customerDetail(String id) async {
+    final results = await Future.wait([
+      Supabase.instance.client
+          .from('customer_addresses')
+          .select(
+            'label, recipient_name, phone, full_address, city, is_primary',
+          )
+          .eq('customer_id', id)
+          .order('is_primary', ascending: false),
+      Supabase.instance.client
+          .from('orders')
+          .select(
+            'order_number, status, schedule_date, estimated_total, final_total',
+          )
+          .eq('customer_id', id)
+          .order('created_at', ascending: false)
+          .limit(8),
+    ]);
+    return {
+      'addresses': List<Map<String, dynamic>>.from(results[0] as List),
+      'orders': List<Map<String, dynamic>>.from(results[1] as List),
+    };
+  }
+
+  void _showDetail(Map<String, dynamic> customer) {
+    showDialog(
+      context: context,
+      builder: (_) => AlertDialog(
+        title: Text(customer['full_name'] as String? ?? 'Detail Customer'),
+        content: SizedBox(
+          width: 620,
+          child: FutureBuilder<Map<String, dynamic>>(
+            future: _customerDetail(customer['id'] as String),
+            builder: (context, snapshot) {
+              if (snapshot.connectionState == ConnectionState.waiting) {
+                return const SizedBox(
+                  height: 220,
+                  child: Center(child: CircularProgressIndicator()),
+                );
+              }
+              final addresses =
+                  snapshot.data?['addresses'] as List<Map<String, dynamic>>? ??
+                  [];
+              final orders =
+                  snapshot.data?['orders'] as List<Map<String, dynamic>>? ?? [];
+              return Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  _DetailLine('Email', customer['email'] as String? ?? '-'),
+                  _DetailLine('Telepon', customer['phone'] as String? ?? '-'),
+                  _DetailLine(
+                    'Status',
+                    (customer['is_active'] as bool? ?? true)
+                        ? 'Aktif'
+                        : 'Nonaktif',
+                  ),
+                  const Divider(height: 26),
+                  const Text(
+                    'Alamat',
+                    style: TextStyle(fontWeight: FontWeight.bold),
+                  ),
+                  const SizedBox(height: 8),
+                  if (addresses.isEmpty)
+                    const Text('Belum ada alamat')
+                  else
+                    ...addresses.map(
+                      (item) => Text(
+                        '${item['label'] ?? 'Alamat'} - ${item['full_address'] ?? '-'}, ${item['city'] ?? '-'}',
+                      ),
+                    ),
+                  const Divider(height: 26),
+                  const Text(
+                    'Order Terakhir',
+                    style: TextStyle(fontWeight: FontWeight.bold),
+                  ),
+                  const SizedBox(height: 8),
+                  if (orders.isEmpty)
+                    const Text('Belum ada order')
+                  else
+                    ...orders.map(
+                      (item) => Text(
+                        '${item['order_number'] ?? '-'} - ${item['status'] ?? '-'} - ${_formatMoney((item['final_total'] as num?)?.toDouble() ?? (item['estimated_total'] as num?)?.toDouble() ?? 0)}',
+                      ),
+                    ),
+                ],
+              );
+            },
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Tutup'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showEditDialog(Map<String, dynamic> customer) {
+    final nameCtrl = TextEditingController(
+      text: customer['full_name'] as String? ?? '',
+    );
+    final emailCtrl = TextEditingController(
+      text: customer['email'] as String? ?? '',
+    );
+    final phoneCtrl = TextEditingController(
+      text: customer['phone'] as String? ?? '',
+    );
+    var isActive = customer['is_active'] as bool? ?? true;
+    showDialog(
+      context: context,
+      builder: (_) => StatefulBuilder(
+        builder: (context, setS) => AlertDialog(
+          title: const Text('Edit Customer'),
+          content: SizedBox(
+            width: 420,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                TextField(
+                  controller: nameCtrl,
+                  decoration: const InputDecoration(labelText: 'Nama'),
+                ),
+                TextField(
+                  controller: emailCtrl,
+                  decoration: const InputDecoration(labelText: 'Email'),
+                ),
+                TextField(
+                  controller: phoneCtrl,
+                  decoration: const InputDecoration(labelText: 'Telepon'),
+                ),
+                SwitchListTile(
+                  value: isActive,
+                  onChanged: (value) => setS(() => isActive = value),
+                  title: const Text('Akun aktif'),
+                ),
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('Batal'),
+            ),
+            FilledButton(
+              onPressed: () {
+                Navigator.pop(context);
+                _updateCustomer(
+                  customer['id'] as String,
+                  fullName: nameCtrl.text.trim(),
+                  email: emailCtrl.text.trim(),
+                  phone: phoneCtrl.text.trim(),
+                  isActive: isActive,
+                );
+              },
+              child: const Text('Simpan'),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _confirmDelete(Map<String, dynamic> customer) {
+    showDialog(
+      context: context,
+      builder: (_) => AlertDialog(
+        title: const Text('Hapus Customer'),
+        content: Text(
+          'Hapus ${(customer['full_name'] as String?) ?? 'customer'} dari database?',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Batal'),
+          ),
+          FilledButton(
+            onPressed: () {
+              Navigator.pop(context);
+              _deleteCustomer(customer['id'] as String);
+            },
+            style: FilledButton.styleFrom(backgroundColor: AppColors.error),
+            child: const Text('Hapus'),
+          ),
+        ],
+      ),
+    );
   }
 
   @override
@@ -74,7 +295,9 @@ class _AdminCustomersScreenState extends State<AdminCustomersScreen> {
           AdminPageHeader(
             title: 'Customer',
             subtitle: 'Kelola data customer',
-            onRefresh: () => setState(() => _future = _fetch()),
+            onRefresh: () => setState(() {
+              _future = _fetch();
+            }),
           ),
           Padding(
             padding: const EdgeInsets.fromLTRB(20, 0, 20, 12),
@@ -109,6 +332,9 @@ class _AdminCustomersScreenState extends State<AdminCustomersScreen> {
                   itemCount: list.length,
                   itemBuilder: (_, i) => _CustomerCard(
                     data: list[i],
+                    onDetail: () => _showDetail(list[i]),
+                    onEdit: () => _showEditDialog(list[i]),
+                    onDelete: () => _confirmDelete(list[i]),
                     onToggleActive: () => _toggleActive(
                       list[i]['id'] as String,
                       list[i]['is_active'] as bool? ?? true,
@@ -125,9 +351,18 @@ class _AdminCustomersScreenState extends State<AdminCustomersScreen> {
 }
 
 class _CustomerCard extends StatelessWidget {
-  const _CustomerCard({required this.data, required this.onToggleActive});
+  const _CustomerCard({
+    required this.data,
+    required this.onToggleActive,
+    required this.onDetail,
+    required this.onEdit,
+    required this.onDelete,
+  });
   final Map<String, dynamic> data;
   final VoidCallback onToggleActive;
+  final VoidCallback onDetail;
+  final VoidCallback onEdit;
+  final VoidCallback onDelete;
 
   @override
   Widget build(BuildContext context) {
@@ -235,6 +470,19 @@ class _CustomerCard extends StatelessWidget {
                     ),
                   ),
                 ),
+                PopupMenuButton<String>(
+                  tooltip: 'Aksi',
+                  onSelected: (value) {
+                    if (value == 'detail') onDetail();
+                    if (value == 'edit') onEdit();
+                    if (value == 'delete') onDelete();
+                  },
+                  itemBuilder: (_) => const [
+                    PopupMenuItem(value: 'detail', child: Text('Detail')),
+                    PopupMenuItem(value: 'edit', child: Text('Edit')),
+                    PopupMenuItem(value: 'delete', child: Text('Hapus')),
+                  ],
+                ),
               ],
             ),
           ],
@@ -242,4 +490,40 @@ class _CustomerCard extends StatelessWidget {
       ),
     );
   }
+}
+
+class _DetailLine extends StatelessWidget {
+  const _DetailLine(this.label, this.value);
+
+  final String label;
+  final String value;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 6),
+      child: Row(
+        children: [
+          SizedBox(
+            width: 92,
+            child: Text(
+              label,
+              style: const TextStyle(color: AppColors.textSecondary),
+            ),
+          ),
+          Expanded(
+            child: Text(
+              value,
+              style: const TextStyle(fontWeight: FontWeight.w700),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+String _formatMoney(double amount) {
+  if (amount <= 0) return '-';
+  return 'Rp ${amount.toStringAsFixed(0).replaceAllMapped(RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'), (m) => '${m[1]}.')}';
 }

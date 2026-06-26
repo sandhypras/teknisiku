@@ -37,7 +37,7 @@ class _AdminOrdersScreenState extends State<AdminOrdersScreen> {
     final q = Supabase.instance.client
         .from('orders')
         .select(
-          'id, order_number, status, schedule_date, schedule_time, final_total, commission_amount, technician_income, created_at, customer:profiles!customer_id(full_name, phone), technician:technician_profiles!technician_id(profile:profiles!user_id(full_name))',
+          'id, order_number, status, schedule_date, schedule_time, problem_description, estimated_total, final_total, commission_percentage, commission_amount, technician_income, created_at, customer:profiles!customer_id(full_name, phone), address:customer_addresses!address_id(full_address, city), technician:technician_profiles!technician_id(profile:profiles!user_id(full_name))',
         );
     final data = status != null
         ? await q
@@ -46,6 +46,32 @@ class _AdminOrdersScreenState extends State<AdminOrdersScreen> {
               .limit(50)
         : await q.order('created_at', ascending: false).limit(50);
     return List<Map<String, dynamic>>.from(data);
+  }
+
+  Future<void> _updateOrder(
+    String id, {
+    required String status,
+    required double finalTotal,
+    required double commissionPercentage,
+  }) async {
+    await Supabase.instance.client
+        .from('orders')
+        .update({
+          'status': status,
+          'final_total': finalTotal,
+          'commission_percentage': commissionPercentage,
+        })
+        .eq('id', id);
+    setState(() {
+      _future = _fetch(_selectedStatus);
+    });
+  }
+
+  Future<void> _deleteOrder(String id) async {
+    await Supabase.instance.client.from('orders').delete().eq('id', id);
+    setState(() {
+      _future = _fetch(_selectedStatus);
+    });
   }
 
   @override
@@ -58,7 +84,9 @@ class _AdminOrdersScreenState extends State<AdminOrdersScreen> {
           AdminPageHeader(
             title: 'Pesanan',
             subtitle: 'Pantau semua pesanan',
-            onRefresh: () => setState(() => _future = _fetch(_selectedStatus)),
+            onRefresh: () => setState(() {
+              _future = _fetch(_selectedStatus);
+            }),
           ),
           _FilterBar(
             options: _statusOptions,
@@ -82,10 +110,163 @@ class _AdminOrdersScreenState extends State<AdminOrdersScreen> {
                 return ListView.builder(
                   padding: const EdgeInsets.all(20),
                   itemCount: list.length,
-                  itemBuilder: (_, i) => _OrderCard(data: list[i]),
+                  itemBuilder: (_, i) => _OrderCard(
+                    data: list[i],
+                    onDetail: () => _showOrderDetail(list[i]),
+                    onEdit: () => _showOrderEdit(list[i]),
+                    onDelete: () => _confirmDeleteOrder(list[i]),
+                  ),
                 );
               },
             ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showOrderDetail(Map<String, dynamic> data) {
+    final customer = data['customer'] as Map<String, dynamic>?;
+    final address = data['address'] as Map<String, dynamic>?;
+    final techProfile =
+        (data['technician'] as Map<String, dynamic>?)?['profile']
+            as Map<String, dynamic>?;
+    showDialog(
+      context: context,
+      builder: (_) => AlertDialog(
+        title: Text(data['order_number'] as String? ?? 'Detail Order'),
+        content: SizedBox(
+          width: 580,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              _DetailLine('Customer', '${customer?['full_name'] ?? '-'}'),
+              _DetailLine('Telepon', '${customer?['phone'] ?? '-'}'),
+              _DetailLine('Teknisi', '${techProfile?['full_name'] ?? '-'}'),
+              _DetailLine('Status', data['status'] as String? ?? '-'),
+              _DetailLine(
+                'Jadwal',
+                '${data['schedule_date'] ?? '-'} ${data['schedule_time'] ?? ''}',
+              ),
+              _DetailLine(
+                'Alamat',
+                '${address?['full_address'] ?? '-'}, ${address?['city'] ?? '-'}',
+              ),
+              _DetailLine(
+                'Estimasi',
+                _OrderCard._fmt(
+                  (data['estimated_total'] as num?)?.toDouble() ?? 0,
+                ),
+              ),
+              _DetailLine(
+                'Total',
+                _OrderCard._fmt((data['final_total'] as num?)?.toDouble() ?? 0),
+              ),
+              const Divider(height: 24),
+              Text(
+                data['problem_description'] as String? ?? 'Tidak ada deskripsi',
+              ),
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Tutup'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showOrderEdit(Map<String, dynamic> data) {
+    var status = data['status'] as String? ?? 'waiting_confirmation';
+    final totalCtrl = TextEditingController(
+      text: '${(data['final_total'] as num?)?.toDouble() ?? 0}',
+    );
+    final commissionCtrl = TextEditingController(
+      text: '${(data['commission_percentage'] as num?)?.toDouble() ?? 10}',
+    );
+    showDialog(
+      context: context,
+      builder: (_) => StatefulBuilder(
+        builder: (context, setS) => AlertDialog(
+          title: Text('Edit ${data['order_number'] ?? 'Order'}'),
+          content: SizedBox(
+            width: 440,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                DropdownButtonFormField<String>(
+                  initialValue: status,
+                  decoration: const InputDecoration(labelText: 'Status order'),
+                  items: _statusOptions
+                      .where((item) => item.$2 != null)
+                      .map(
+                        (item) => DropdownMenuItem(
+                          value: item.$2,
+                          child: Text(item.$1),
+                        ),
+                      )
+                      .toList(),
+                  onChanged: (value) => setS(() => status = value ?? status),
+                ),
+                TextField(
+                  controller: totalCtrl,
+                  decoration: const InputDecoration(labelText: 'Final total'),
+                  keyboardType: TextInputType.number,
+                ),
+                TextField(
+                  controller: commissionCtrl,
+                  decoration: const InputDecoration(labelText: 'Komisi %'),
+                  keyboardType: TextInputType.number,
+                ),
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('Batal'),
+            ),
+            FilledButton(
+              onPressed: () {
+                Navigator.pop(context);
+                _updateOrder(
+                  data['id'] as String,
+                  status: status,
+                  finalTotal: double.tryParse(totalCtrl.text.trim()) ?? 0,
+                  commissionPercentage:
+                      double.tryParse(commissionCtrl.text.trim()) ?? 10,
+                );
+              },
+              child: const Text('Simpan'),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _confirmDeleteOrder(Map<String, dynamic> data) {
+    showDialog(
+      context: context,
+      builder: (_) => AlertDialog(
+        title: const Text('Hapus Order'),
+        content: Text('Hapus order ${data['order_number'] ?? ''}?'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Batal'),
+          ),
+          FilledButton(
+            onPressed: () {
+              Navigator.pop(context);
+              _deleteOrder(data['id'] as String);
+            },
+            style: FilledButton.styleFrom(backgroundColor: AppColors.error),
+            child: const Text('Hapus'),
           ),
         ],
       ),
@@ -146,8 +327,16 @@ class _FilterBar extends StatelessWidget {
 }
 
 class _OrderCard extends StatelessWidget {
-  const _OrderCard({required this.data});
+  const _OrderCard({
+    required this.data,
+    required this.onDetail,
+    required this.onEdit,
+    required this.onDelete,
+  });
   final Map<String, dynamic> data;
+  final VoidCallback onDetail;
+  final VoidCallback onEdit;
+  final VoidCallback onDelete;
 
   @override
   Widget build(BuildContext context) {
@@ -208,6 +397,18 @@ class _OrderCard extends StatelessWidget {
                       fontWeight: FontWeight.w600,
                     ),
                   ),
+                ),
+                PopupMenuButton<String>(
+                  onSelected: (value) {
+                    if (value == 'detail') onDetail();
+                    if (value == 'edit') onEdit();
+                    if (value == 'delete') onDelete();
+                  },
+                  itemBuilder: (_) => const [
+                    PopupMenuItem(value: 'detail', child: Text('Detail')),
+                    PopupMenuItem(value: 'edit', child: Text('Edit')),
+                    PopupMenuItem(value: 'delete', child: Text('Hapus')),
+                  ],
                 ),
               ],
             ),
@@ -313,6 +514,37 @@ class _OrderCard extends StatelessWidget {
   static String _fmt(double v) => v == 0
       ? '-'
       : 'Rp ${v.toStringAsFixed(0).replaceAllMapped(RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'), (m) => '${m[1]}.')}';
+}
+
+class _DetailLine extends StatelessWidget {
+  const _DetailLine(this.label, this.value);
+  final String label;
+  final String value;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 8),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          SizedBox(
+            width: 90,
+            child: Text(
+              label,
+              style: const TextStyle(color: AppColors.textSecondary),
+            ),
+          ),
+          Expanded(
+            child: Text(
+              value,
+              style: const TextStyle(fontWeight: FontWeight.w700),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
 }
 
 class _BadgeStyle {

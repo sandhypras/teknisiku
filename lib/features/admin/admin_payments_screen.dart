@@ -51,7 +51,36 @@ class _AdminPaymentsScreenState extends State<AdminPaymentsScreen> {
           'paid_at': status == 'paid' ? DateTime.now().toIso8601String() : null,
         })
         .eq('id', id);
-    setState(() => _future = _fetch(_selectedStatus));
+    setState(() {
+      _future = _fetch(_selectedStatus);
+    });
+  }
+
+  Future<void> _updatePayment(
+    String id, {
+    required String status,
+    required String method,
+    required double amount,
+  }) async {
+    await Supabase.instance.client
+        .from('payments')
+        .update({
+          'payment_status': status,
+          'payment_method': method,
+          'amount': amount,
+          'paid_at': status == 'paid' ? DateTime.now().toIso8601String() : null,
+        })
+        .eq('id', id);
+    setState(() {
+      _future = _fetch(_selectedStatus);
+    });
+  }
+
+  Future<void> _deletePayment(String id) async {
+    await Supabase.instance.client.from('payments').delete().eq('id', id);
+    setState(() {
+      _future = _fetch(_selectedStatus);
+    });
   }
 
   @override
@@ -64,7 +93,9 @@ class _AdminPaymentsScreenState extends State<AdminPaymentsScreen> {
           AdminPageHeader(
             title: 'Pembayaran',
             subtitle: 'Verifikasi pembayaran customer',
-            onRefresh: () => setState(() => _future = _fetch(_selectedStatus)),
+            onRefresh: () => setState(() {
+              _future = _fetch(_selectedStatus);
+            }),
           ),
           _FilterBar(
             options: _filters,
@@ -84,8 +115,9 @@ class _AdminPaymentsScreenState extends State<AdminPaymentsScreen> {
                 if (snapshot.hasError) {
                   return AdminErrorState(
                     message: snapshot.error.toString(),
-                    onRetry: () =>
-                        setState(() => _future = _fetch(_selectedStatus)),
+                    onRetry: () => setState(() {
+                      _future = _fetch(_selectedStatus);
+                    }),
                   );
                 }
                 final rows = snapshot.data ?? [];
@@ -101,10 +133,203 @@ class _AdminPaymentsScreenState extends State<AdminPaymentsScreen> {
                         _setStatus(rows[i]['id'] as String, 'paid'),
                     onReject: () =>
                         _setStatus(rows[i]['id'] as String, 'rejected'),
+                    onDetail: () => _showPaymentDetail(rows[i]),
+                    onEdit: () => _showPaymentEdit(rows[i]),
+                    onDelete: () => _confirmDeletePayment(rows[i]),
+                    onProof: () => _showPaymentProof(rows[i]),
                   ),
                 );
               },
             ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showPaymentDetail(Map<String, dynamic> data) {
+    final order = data['order'] as Map<String, dynamic>?;
+    final customer = order?['customer'] as Map<String, dynamic>?;
+    final technician =
+        (order?['technician'] as Map<String, dynamic>?)?['profile']
+            as Map<String, dynamic>?;
+    showDialog(
+      context: context,
+      builder: (_) => AlertDialog(
+        title: Text(order?['order_number'] as String? ?? 'Detail Pembayaran'),
+        content: SizedBox(
+          width: 520,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              _DetailLine('Customer', '${customer?['full_name'] ?? '-'}'),
+              _DetailLine('Teknisi', '${technician?['full_name'] ?? '-'}'),
+              _DetailLine(
+                'Metode',
+                _methodLabel(data['payment_method'] as String?),
+              ),
+              _DetailLine('Status', data['payment_status'] as String? ?? '-'),
+              _DetailLine(
+                'Amount',
+                formatRupiah((data['amount'] as num?)?.toDouble() ?? 0),
+              ),
+              _DetailLine('Dibayar', data['paid_at'] as String? ?? '-'),
+            ],
+          ),
+        ),
+        actions: [
+          if ((data['proof_url'] as String?)?.isNotEmpty == true)
+            TextButton(
+              onPressed: () => _showPaymentProof(data),
+              child: const Text('Lihat Bukti'),
+            ),
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Tutup'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showPaymentEdit(Map<String, dynamic> data) {
+    var status = data['payment_status'] as String? ?? 'unpaid';
+    var method = data['payment_method'] as String? ?? 'cash';
+    final amountCtrl = TextEditingController(
+      text: '${(data['amount'] as num?)?.toDouble() ?? 0}',
+    );
+    showDialog(
+      context: context,
+      builder: (_) => StatefulBuilder(
+        builder: (context, setS) => AlertDialog(
+          title: const Text('Edit Pembayaran'),
+          content: SizedBox(
+            width: 420,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                TextField(
+                  controller: amountCtrl,
+                  decoration: const InputDecoration(labelText: 'Amount'),
+                  keyboardType: TextInputType.number,
+                ),
+                DropdownButtonFormField<String>(
+                  initialValue: method,
+                  decoration: const InputDecoration(labelText: 'Metode'),
+                  items: const [
+                    DropdownMenuItem(value: 'cash', child: Text('Cash')),
+                    DropdownMenuItem(
+                      value: 'bank_transfer',
+                      child: Text('Transfer Bank'),
+                    ),
+                  ],
+                  onChanged: (value) => setS(() => method = value ?? method),
+                ),
+                DropdownButtonFormField<String>(
+                  initialValue: status,
+                  decoration: const InputDecoration(labelText: 'Status'),
+                  items: const [
+                    DropdownMenuItem(value: 'unpaid', child: Text('Unpaid')),
+                    DropdownMenuItem(
+                      value: 'waiting_verification',
+                      child: Text('Verifikasi'),
+                    ),
+                    DropdownMenuItem(value: 'paid', child: Text('Paid')),
+                    DropdownMenuItem(
+                      value: 'rejected',
+                      child: Text('Rejected'),
+                    ),
+                  ],
+                  onChanged: (value) => setS(() => status = value ?? status),
+                ),
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('Batal'),
+            ),
+            FilledButton(
+              onPressed: () {
+                Navigator.pop(context);
+                _updatePayment(
+                  data['id'] as String,
+                  status: status,
+                  method: method,
+                  amount: double.tryParse(amountCtrl.text.trim()) ?? 0,
+                );
+              },
+              child: const Text('Simpan'),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Future<void> _showPaymentProof(Map<String, dynamic> data) async {
+    final proof = data['proof_url'] as String? ?? '';
+    if (proof.isEmpty) return;
+    final path = proof.replaceFirst('payment-proofs/', '');
+    showDialog(
+      context: context,
+      builder: (_) => AlertDialog(
+        title: const Text('Bukti Pembayaran'),
+        content: SizedBox(
+          width: 520,
+          height: 420,
+          child: FutureBuilder<String>(
+            future: proof.startsWith('http')
+                ? Future.value(proof)
+                : Supabase.instance.client.storage
+                      .from('payment-proofs')
+                      .createSignedUrl(path, 600),
+            builder: (_, snapshot) {
+              if (snapshot.connectionState == ConnectionState.waiting) {
+                return const Center(child: CircularProgressIndicator());
+              }
+              if (snapshot.hasError) {
+                return Center(child: Text(snapshot.error.toString()));
+              }
+              return Image.network(
+                snapshot.data!,
+                fit: BoxFit.contain,
+                errorBuilder: (_, _, _) =>
+                    const Center(child: Text('Gagal memuat bukti')),
+              );
+            },
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Tutup'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _confirmDeletePayment(Map<String, dynamic> data) {
+    showDialog(
+      context: context,
+      builder: (_) => AlertDialog(
+        title: const Text('Hapus Pembayaran'),
+        content: const Text('Hapus data pembayaran ini?'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Batal'),
+          ),
+          FilledButton(
+            onPressed: () {
+              Navigator.pop(context);
+              _deletePayment(data['id'] as String);
+            },
+            style: FilledButton.styleFrom(backgroundColor: AppColors.error),
+            child: const Text('Hapus'),
           ),
         ],
       ),
@@ -159,11 +384,19 @@ class _PaymentCard extends StatelessWidget {
     required this.data,
     required this.onApprove,
     required this.onReject,
+    required this.onDetail,
+    required this.onEdit,
+    required this.onDelete,
+    required this.onProof,
   });
 
   final Map<String, dynamic> data;
   final VoidCallback onApprove;
   final VoidCallback onReject;
+  final VoidCallback onDetail;
+  final VoidCallback onEdit;
+  final VoidCallback onDelete;
+  final VoidCallback onProof;
 
   @override
   Widget build(BuildContext context) {
@@ -210,6 +443,20 @@ class _PaymentCard extends StatelessWidget {
                 label: badge.label,
                 color: badge.color,
                 bg: badge.bg,
+              ),
+              PopupMenuButton<String>(
+                onSelected: (value) {
+                  if (value == 'detail') onDetail();
+                  if (value == 'edit') onEdit();
+                  if (value == 'proof') onProof();
+                  if (value == 'delete') onDelete();
+                },
+                itemBuilder: (_) => const [
+                  PopupMenuItem(value: 'detail', child: Text('Detail')),
+                  PopupMenuItem(value: 'edit', child: Text('Edit')),
+                  PopupMenuItem(value: 'proof', child: Text('Lihat Bukti')),
+                  PopupMenuItem(value: 'delete', child: Text('Hapus')),
+                ],
               ),
             ],
           ),
@@ -262,6 +509,36 @@ class _PaymentCard extends StatelessWidget {
               ],
             ),
           ],
+        ],
+      ),
+    );
+  }
+}
+
+class _DetailLine extends StatelessWidget {
+  const _DetailLine(this.label, this.value);
+  final String label;
+  final String value;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 8),
+      child: Row(
+        children: [
+          SizedBox(
+            width: 90,
+            child: Text(
+              label,
+              style: const TextStyle(color: AppColors.textSecondary),
+            ),
+          ),
+          Expanded(
+            child: Text(
+              value,
+              style: const TextStyle(fontWeight: FontWeight.w700),
+            ),
+          ),
         ],
       ),
     );

@@ -50,17 +50,20 @@ class ServiceCategory {
     required this.id,
     required this.name,
     this.description,
+    this.iconUrl,
   });
 
   final String id;
   final String name;
   final String? description;
+  final String? iconUrl;
 
   factory ServiceCategory.fromJson(Map<String, dynamic> json) {
     return ServiceCategory(
       id: json['id'] as String,
       name: json['name'] as String? ?? '-',
       description: json['description'] as String?,
+      iconUrl: json['icon_url'] as String?,
     );
   }
 }
@@ -152,6 +155,32 @@ class TechnicianService {
   }
 }
 
+class TechnicianDocument {
+  const TechnicianDocument({
+    required this.id,
+    required this.technicianId,
+    required this.documentType,
+    required this.fileUrl,
+    required this.uploadedAt,
+  });
+
+  final String id;
+  final String technicianId;
+  final String documentType;
+  final String fileUrl;
+  final DateTime? uploadedAt;
+
+  factory TechnicianDocument.fromJson(Map<String, dynamic> json) {
+    return TechnicianDocument(
+      id: json['id'] as String,
+      technicianId: json['technician_id'] as String? ?? '',
+      documentType: json['document_type'] as String? ?? '',
+      fileUrl: json['file_url'] as String? ?? '',
+      uploadedAt: DateTime.tryParse('${json['uploaded_at']}'),
+    );
+  }
+}
+
 class CustomerAddress {
   const CustomerAddress({
     required this.id,
@@ -197,6 +226,9 @@ class OrderSummary {
     required this.customerName,
     required this.technicianName,
     required this.createdAt,
+    this.customerPhone,
+    this.address,
+    this.city,
   });
 
   final String id;
@@ -210,9 +242,13 @@ class OrderSummary {
   final String customerName;
   final String technicianName;
   final DateTime? createdAt;
+  final String? customerPhone;
+  final String? address;
+  final String? city;
 
   factory OrderSummary.fromJson(Map<String, dynamic> json) {
     final customer = json['customer'] as Map<String, dynamic>?;
+    final address = json['address'] as Map<String, dynamic>?;
     final technician =
         (json['technician'] as Map<String, dynamic>?)?['profile']
             as Map<String, dynamic>?;
@@ -226,8 +262,11 @@ class OrderSummary {
       scheduleDate: '${json['schedule_date'] ?? '-'}',
       scheduleTime: '${json['schedule_time'] ?? ''}',
       customerName: customer?['full_name'] as String? ?? '-',
+      customerPhone: customer?['phone'] as String?,
       technicianName: technician?['full_name'] as String? ?? '-',
       createdAt: DateTime.tryParse('${json['created_at']}'),
+      address: address?['full_address'] as String?,
+      city: address?['city'] as String?,
     );
   }
 }

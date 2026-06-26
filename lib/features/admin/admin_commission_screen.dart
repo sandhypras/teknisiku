@@ -69,7 +69,9 @@ class _AdminCommissionScreenState extends State<AdminCommissionScreen> {
           AdminPageHeader(
             title: 'Komisi',
             subtitle: 'Rekap komisi platform dari order',
-            onRefresh: () => setState(() => _future = _fetch()),
+            onRefresh: () => setState(() {
+              _future = _fetch();
+            }),
           ),
           Expanded(
             child: FutureBuilder<_CommissionData>(
@@ -81,7 +83,9 @@ class _AdminCommissionScreenState extends State<AdminCommissionScreen> {
                 if (snapshot.hasError) {
                   return AdminErrorState(
                     message: snapshot.error.toString(),
-                    onRetry: () => setState(() => _future = _fetch()),
+                    onRetry: () => setState(() {
+                      _future = _fetch();
+                    }),
                   );
                 }
                 final data = snapshot.data!;

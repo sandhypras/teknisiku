@@ -77,7 +77,9 @@ class _AdminSettingsScreenState extends State<AdminSettingsScreen> {
         ScaffoldMessenger.of(
           context,
         ).showSnackBar(const SnackBar(content: Text('Pengaturan disimpan')));
-        setState(() => _future = _fetch());
+        setState(() {
+          _future = _fetch();
+        });
       }
     } finally {
       if (mounted) {
@@ -96,7 +98,9 @@ class _AdminSettingsScreenState extends State<AdminSettingsScreen> {
           AdminPageHeader(
             title: 'Pengaturan',
             subtitle: 'Kelola konfigurasi aplikasi dari Supabase',
-            onRefresh: () => setState(() => _future = _fetch()),
+            onRefresh: () => setState(() {
+              _future = _fetch();
+            }),
           ),
           Expanded(
             child: FutureBuilder<Map<String, dynamic>>(
@@ -108,7 +112,9 @@ class _AdminSettingsScreenState extends State<AdminSettingsScreen> {
                 if (snapshot.hasError) {
                   return AdminErrorState(
                     message: snapshot.error.toString(),
-                    onRetry: () => setState(() => _future = _fetch()),
+                    onRetry: () => setState(() {
+                      _future = _fetch();
+                    }),
                   );
                 }
                 return ListView(
