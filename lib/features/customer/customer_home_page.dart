@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../app/theme.dart';
 import '../../core/models/mobile_models.dart';
 import '../../core/services/marketplace_repository.dart';
 import '../../shared/mobile_ui.dart';
@@ -9,11 +10,13 @@ class CustomerHomePage extends StatefulWidget {
   const CustomerHomePage({
     required this.profile,
     required this.repo,
+    this.onGoToOrders,
     super.key,
   });
 
   final AppProfile profile;
   final MarketplaceRepository repo;
+  final VoidCallback? onGoToOrders;
 
   @override
   State<CustomerHomePage> createState() => _CustomerHomePageState();
@@ -59,130 +62,150 @@ class _CustomerHomePageState extends State<CustomerHomePage> {
 
   @override
   Widget build(BuildContext context) {
-    return SafeArea(
-      bottom: false,
-      child: FutureBuilder<_CustomerHomeData>(
-        future: _future,
-        builder: (context, snapshot) {
-          if (snapshot.connectionState == ConnectionState.waiting) {
-            return const Center(child: CircularProgressIndicator());
-          }
-          if (snapshot.hasError) {
-            return ErrorState(
-              message: snapshot.error.toString(),
-              onRetry: _refresh,
-            );
-          }
-          final data = snapshot.data!;
-          final activeOrders = data.orders
-              .where((item) => item.status != 'completed')
-              .length;
-          final normalized = _query.toLowerCase();
-          final technicians = normalized.isEmpty
-              ? data.technicians
-              : data.technicians
-                    .where(
-                      (item) =>
-                          item.name.toLowerCase().contains(normalized) ||
-                          item.skills
-                              .join(' ')
-                              .toLowerCase()
-                              .contains(normalized),
-                    )
-                    .toList();
+    return Container(
+      decoration: const BoxDecoration(
+        gradient: LinearGradient(
+          colors: [Color(0xFFF3F8FF), Color(0xFFFAFCFF)],
+          begin: Alignment.topCenter,
+          end: Alignment.bottomCenter,
+          stops: [0.0, 0.32],
+        ),
+      ),
+      child: SafeArea(
+        bottom: false,
+        child: FutureBuilder<_CustomerHomeData>(
+          future: _future,
+          builder: (context, snapshot) {
+            if (snapshot.connectionState == ConnectionState.waiting) {
+              return const Center(
+                child: CircularProgressIndicator(color: AppColors.primary),
+              );
+            }
+            if (snapshot.hasError) {
+              return ErrorState(
+                message: snapshot.error.toString(),
+                onRetry: _refresh,
+              );
+            }
+            final data = snapshot.data!;
+            final activeOrderItems = data.orders
+                .where((item) => item.status != 'completed')
+                .toList();
+            final activeOrders = activeOrderItems.length;
+            final latestActiveOrder = activeOrderItems.isEmpty
+                ? null
+                : activeOrderItems.first;
+            final normalized = _query.toLowerCase();
+            final technicians = normalized.isEmpty
+                ? data.technicians
+                : data.technicians
+                      .where(
+                        (item) =>
+                            item.name.toLowerCase().contains(normalized) ||
+                            item.skills
+                                .join(' ')
+                                .toLowerCase()
+                                .contains(normalized),
+                      )
+                      .toList();
 
-          return RefreshIndicator(
-            onRefresh: () async => _refresh(),
-            child: ListView(
-              padding: const EdgeInsets.fromLTRB(22, 18, 22, 24),
-              children: [
-                _CustomerHeader(name: widget.profile.fullName),
-                const SizedBox(height: 28),
-                Text(
-                  'Halo, ${_firstName(widget.profile.fullName)}!',
-                  style: const TextStyle(
-                    color: Color(0xFF07143D),
-                    fontSize: 25,
-                    fontWeight: FontWeight.w900,
-                    letterSpacing: 0,
+            return RefreshIndicator(
+              color: AppColors.primary,
+              onRefresh: () async => _refresh(),
+              child: ListView(
+                padding: const EdgeInsets.fromLTRB(20, 16, 20, 28),
+                children: [
+                  const _CustomerBrandHeader(),
+                  const SizedBox(height: 18),
+                  _CustomerHero(
+                    profile: widget.profile,
+                    activeOrders: activeOrders,
+                    onOrderTap: widget.onGoToOrders,
                   ),
-                ),
-                const SizedBox(height: 6),
-                const Text(
-                  'Butuh bantuan teknisi? Kami siap membantumu.',
-                  style: TextStyle(
-                    color: Color(0xFF51607A),
-                    fontSize: 15,
-                    fontWeight: FontWeight.w500,
+                  const SizedBox(height: 16),
+                  _QuickActionRow(
+                    categories: data.categories.length,
+                    technicians: data.technicians.length,
+                    activeOrders: activeOrders,
+                    onOrdersTap: widget.onGoToOrders,
                   ),
-                ),
-                const SizedBox(height: 22),
-                _SearchLocationBar(controller: _searchController),
-                const SizedBox(height: 26),
-                _SectionTitle(
-                  title: 'Kategori Layanan',
-                  actionLabel: 'Lihat semua',
-                  onAction: _refresh,
-                ),
-                const SizedBox(height: 14),
-                _CategoryGrid(categories: data.categories),
-                const SizedBox(height: 26),
-                _SectionTitle(
-                  title: 'Teknisi Terdekat',
-                  actionLabel: 'Lihat semua',
-                  onAction: _refresh,
-                ),
-                const SizedBox(height: 14),
-                if (technicians.isEmpty)
-                  const SizedBox(
-                    height: 170,
-                    child: EmptyState(message: 'Belum ada teknisi yang cocok'),
-                  )
-                else
-                  _TechnicianStrip(
-                    technicians: technicians,
-                    onTap: (technician) => Navigator.of(context).push(
-                      MaterialPageRoute(
-                        builder: (_) =>
-                            TechnicianDetailPage(technicianId: technician.id),
+                  const SizedBox(height: 18),
+                  _SearchLocationBar(controller: _searchController),
+                  const SizedBox(height: 20),
+                  _ActiveOrderPanel(
+                    order: latestActiveOrder,
+                    onTap: widget.onGoToOrders,
+                  ),
+                  const SizedBox(height: 26),
+                  _SectionLabel(
+                    icon: Icons.home_repair_service_rounded,
+                    title: 'Kategori Layanan',
+                    trailing: '${data.categories.length}',
+                  ),
+                  const SizedBox(height: 14),
+                  _CategoryGrid(categories: data.categories),
+                  const SizedBox(height: 26),
+                  _SectionLabel(
+                    icon: Icons.engineering_rounded,
+                    title: 'Teknisi Terdekat',
+                    trailing: '${technicians.length}',
+                  ),
+                  const SizedBox(height: 14),
+                  if (technicians.isEmpty)
+                    const SizedBox(
+                      height: 170,
+                      child: EmptyState(
+                        message: 'Belum ada teknisi yang cocok',
+                      ),
+                    )
+                  else
+                    _TechnicianStrip(
+                      technicians: technicians,
+                      onTap: (technician) => Navigator.of(context).push(
+                        MaterialPageRoute(
+                          builder: (_) =>
+                              TechnicianDetailPage(technicianId: technician.id),
+                        ),
                       ),
                     ),
+                  const SizedBox(height: 20),
+                  const _PromoBanner(),
+                  const SizedBox(height: 20),
+                  _SectionLabel(
+                    icon: Icons.receipt_long_rounded,
+                    title: 'Pesanan Terbaru',
+                    trailing: '${data.orders.length}',
                   ),
-                const SizedBox(height: 20),
-                const _PromoBanner(),
-                const SizedBox(height: 20),
-                _OrderPrompt(activeOrders: activeOrders),
-              ],
-            ),
-          );
-        },
+                  const SizedBox(height: 12),
+                  if (data.orders.isEmpty)
+                    const SizedBox(
+                      height: 180,
+                      child: EmptyState(message: 'Belum ada pesanan'),
+                    )
+                  else
+                    for (final order in data.orders.take(3)) ...[
+                      _CustomerOrderPreview(order: order),
+                      const SizedBox(height: 12),
+                    ],
+                ],
+              ),
+            );
+          },
+        ),
       ),
     );
   }
 }
 
-class _CustomerHeader extends StatelessWidget {
-  const _CustomerHeader({required this.name});
-
-  final String name;
+class _CustomerBrandHeader extends StatelessWidget {
+  const _CustomerBrandHeader();
 
   @override
   Widget build(BuildContext context) {
     return Row(
       children: [
-        Container(
-          width: 70,
-          height: 70,
-          padding: const EdgeInsets.all(6),
-          decoration: const BoxDecoration(
-            color: Color(0xFF1269D3),
-            shape: BoxShape.circle,
-          ),
-          child: ClipOval(
-            child: Image.asset('assets/logos/logoku.png', fit: BoxFit.contain),
-          ),
-        ),
-        const SizedBox(width: 14),
+        const AppLogoMark(size: 66),
+        const SizedBox(width: 10),
         const Expanded(
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -190,39 +213,493 @@ class _CustomerHeader extends StatelessWidget {
               Text(
                 'Si Teknisi',
                 style: TextStyle(
-                  color: Color(0xFF0964CC),
-                  fontSize: 30,
+                  color: AppColors.primary,
+                  fontSize: 28,
                   fontWeight: FontWeight.w900,
-                  height: 1,
                   letterSpacing: 0,
                 ),
               ),
-              SizedBox(height: 2),
               Text(
                 'Solusi Cepat, Hasil Tepat',
                 style: TextStyle(
-                  color: Color(0xFF0964CC),
+                  color: AppColors.primary,
                   fontSize: 12,
                   fontWeight: FontWeight.w800,
+                  letterSpacing: 0.2,
                 ),
               ),
             ],
           ),
         ),
-        Container(
-          width: 58,
-          height: 58,
-          decoration: _softDecoration(radius: 20),
-          child: IconButton(
-            onPressed: () {},
-            icon: const Icon(
-              Icons.notifications_none_rounded,
-              color: Color(0xFF0D58BE),
-              size: 28,
+        Stack(
+          clipBehavior: Clip.none,
+          children: [
+            const _SquareIcon(icon: Icons.notifications_none_rounded),
+            Positioned(
+              right: 8,
+              top: 8,
+              child: Container(
+                width: 10,
+                height: 10,
+                decoration: BoxDecoration(
+                  color: const Color(0xFFFF3030),
+                  shape: BoxShape.circle,
+                  border: Border.all(color: Colors.white, width: 1.5),
+                ),
+              ),
             ),
+          ],
+        ),
+      ],
+    );
+  }
+}
+
+class _SectionLabel extends StatelessWidget {
+  const _SectionLabel({required this.icon, required this.title, this.trailing});
+
+  final IconData icon;
+  final String title;
+  final String? trailing;
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: [
+        Container(
+          width: 30,
+          height: 30,
+          decoration: BoxDecoration(
+            color: AppColors.primary.withValues(alpha: 0.10),
+            borderRadius: BorderRadius.circular(9),
+          ),
+          child: Icon(icon, color: AppColors.primary, size: 17),
+        ),
+        const SizedBox(width: 10),
+        Text(
+          title,
+          style: const TextStyle(
+            color: AppColors.textPrimary,
+            fontSize: 19,
+            fontWeight: FontWeight.w900,
+            letterSpacing: 0,
+          ),
+        ),
+        if (trailing != null) ...[
+          const SizedBox(width: 8),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+            decoration: BoxDecoration(
+              color: AppColors.primary.withValues(alpha: 0.10),
+              borderRadius: BorderRadius.circular(20),
+            ),
+            child: Text(
+              trailing!,
+              style: const TextStyle(
+                color: AppColors.primary,
+                fontSize: 12,
+                fontWeight: FontWeight.w900,
+              ),
+            ),
+          ),
+        ],
+      ],
+    );
+  }
+}
+
+class _CustomerHero extends StatelessWidget {
+  const _CustomerHero({
+    required this.profile,
+    required this.activeOrders,
+    required this.onOrderTap,
+  });
+
+  final AppProfile profile;
+  final int activeOrders;
+  final VoidCallback? onOrderTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(18),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(24),
+        border: Border.all(color: const Color(0xFFE4ECF6)),
+        boxShadow: [
+          BoxShadow(
+            color: const Color(0xFF234D79).withValues(alpha: 0.10),
+            blurRadius: 22,
+            offset: const Offset(0, 10),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              CircleAvatar(
+                radius: 28,
+                backgroundColor: AppColors.primary.withValues(alpha: 0.10),
+                child: Text(
+                  _initials(profile.fullName),
+                  style: const TextStyle(
+                    color: AppColors.primary,
+                    fontSize: 20,
+                    fontWeight: FontWeight.w900,
+                  ),
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Halo, ${profile.fullName.isEmpty ? 'Customer' : profile.fullName}',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        color: AppColors.textPrimary,
+                        fontSize: 20,
+                        fontWeight: FontWeight.w900,
+                        letterSpacing: 0,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    const Text(
+                      'Mau servis apa hari ini?',
+                      style: TextStyle(
+                        color: AppColors.textSecondary,
+                        fontSize: 13,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 18),
+          Container(
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              gradient: const LinearGradient(
+                colors: [Color(0xFF075AC8), Color(0xFF13A3F7)],
+                begin: Alignment.centerLeft,
+                end: Alignment.centerRight,
+              ),
+              borderRadius: BorderRadius.circular(18),
+            ),
+            child: Row(
+              children: [
+                const Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Cari teknisi terpercaya di dekatmu',
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontSize: 19,
+                          height: 1.15,
+                          fontWeight: FontWeight.w900,
+                          letterSpacing: 0,
+                        ),
+                      ),
+                      SizedBox(height: 8),
+                      Text(
+                        'Pilih kategori, cek teknisi, lalu pesan layanan.',
+                        style: TextStyle(
+                          color: Color(0xFFEAF4FF),
+                          fontSize: 12,
+                          height: 1.3,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Container(
+                  width: 72,
+                  height: 72,
+                  decoration: BoxDecoration(
+                    color: Colors.white.withValues(alpha: 0.18),
+                    borderRadius: BorderRadius.circular(22),
+                  ),
+                  child: const Icon(
+                    Icons.home_repair_service_rounded,
+                    color: Colors.white,
+                    size: 42,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 14),
+          Row(
+            children: [
+              Expanded(
+                child: FilledButton.icon(
+                  onPressed: onOrderTap,
+                  icon: const Icon(Icons.receipt_long_rounded),
+                  label: Text(
+                    activeOrders == 0 ? 'Mulai Pesan' : 'Lihat Pesanan',
+                    style: const TextStyle(fontWeight: FontWeight.w900),
+                  ),
+                ),
+              ),
+              const SizedBox(width: 10),
+              Container(
+                height: 48,
+                padding: const EdgeInsets.symmetric(horizontal: 12),
+                decoration: BoxDecoration(
+                  color: AppColors.accent.withValues(alpha: 0.14),
+                  borderRadius: BorderRadius.circular(14),
+                ),
+                child: const Row(
+                  children: [
+                    Icon(
+                      Icons.location_on_rounded,
+                      color: Color(0xFF9B5A12),
+                      size: 18,
+                    ),
+                    SizedBox(width: 4),
+                    Text(
+                      'Solo',
+                      style: TextStyle(
+                        color: Color(0xFF9B5A12),
+                        fontWeight: FontWeight.w900,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _QuickActionRow extends StatelessWidget {
+  const _QuickActionRow({
+    required this.categories,
+    required this.technicians,
+    required this.activeOrders,
+    required this.onOrdersTap,
+  });
+
+  final int categories;
+  final int technicians;
+  final int activeOrders;
+  final VoidCallback? onOrdersTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: [
+        Expanded(
+          child: _QuickActionChip(
+            icon: Icons.grid_view_rounded,
+            label: 'Kategori',
+            value: '$categories',
+            color: AppColors.primary,
+          ),
+        ),
+        const SizedBox(width: 10),
+        Expanded(
+          child: _QuickActionChip(
+            icon: Icons.engineering_rounded,
+            label: 'Teknisi',
+            value: '$technicians',
+            color: AppColors.success,
+          ),
+        ),
+        const SizedBox(width: 10),
+        Expanded(
+          child: _QuickActionChip(
+            icon: Icons.receipt_long_rounded,
+            label: 'Pesanan',
+            value: '$activeOrders',
+            color: const Color(0xFFFFA726),
+            onTap: onOrdersTap,
           ),
         ),
       ],
+    );
+  }
+}
+
+class _QuickActionChip extends StatelessWidget {
+  const _QuickActionChip({
+    required this.icon,
+    required this.label,
+    required this.value,
+    required this.color,
+    this.onTap,
+  });
+
+  final IconData icon;
+  final String label;
+  final String value;
+  final Color color;
+  final VoidCallback? onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: Colors.white,
+      borderRadius: BorderRadius.circular(18),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(18),
+        onTap: onTap,
+        child: Container(
+          height: 94,
+          padding: const EdgeInsets.all(12),
+          decoration: _softDecoration(radius: 18),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Icon(icon, color: color, size: 24),
+              const Spacer(),
+              Text(
+                value,
+                style: const TextStyle(
+                  color: AppColors.textPrimary,
+                  fontSize: 20,
+                  height: 1,
+                  fontWeight: FontWeight.w900,
+                ),
+              ),
+              const SizedBox(height: 3),
+              Text(
+                label,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(
+                  color: AppColors.textSecondary,
+                  fontSize: 11,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _ActiveOrderPanel extends StatelessWidget {
+  const _ActiveOrderPanel({required this.order, required this.onTap});
+
+  final OrderSummary? order;
+  final VoidCallback? onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final order = this.order;
+    return Material(
+      color: Colors.white,
+      borderRadius: BorderRadius.circular(20),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(20),
+        onTap: onTap,
+        child: Container(
+          padding: const EdgeInsets.all(16),
+          decoration: _softDecoration(radius: 20),
+          child: Row(
+            children: [
+              Container(
+                width: 52,
+                height: 52,
+                decoration: BoxDecoration(
+                  color:
+                      (order == null
+                              ? AppColors.primary
+                              : orderStatusColor(order.status))
+                          .withValues(alpha: 0.12),
+                  borderRadius: BorderRadius.circular(17),
+                ),
+                child: Icon(
+                  order == null
+                      ? Icons.add_task_rounded
+                      : Icons.assignment_turned_in_rounded,
+                  color: order == null
+                      ? AppColors.primary
+                      : orderStatusColor(order.status),
+                ),
+              ),
+              const SizedBox(width: 14),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      order == null
+                          ? 'Belum ada pesanan aktif'
+                          : 'Pesanan aktif',
+                      style: const TextStyle(
+                        color: AppColors.textPrimary,
+                        fontSize: 15,
+                        fontWeight: FontWeight.w900,
+                      ),
+                    ),
+                    const SizedBox(height: 5),
+                    Text(
+                      order == null
+                          ? 'Pilih layanan dan teknisi untuk mulai memesan.'
+                          : '${orderStatusLabel(order.status)} - ${order.technicianName}',
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        color: AppColors.textSecondary,
+                        fontSize: 12,
+                        height: 1.25,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 10),
+              const Icon(Icons.chevron_right_rounded, color: AppColors.primary),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _SquareIcon extends StatelessWidget {
+  const _SquareIcon({required this.icon});
+
+  final IconData icon;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: 52,
+      height: 52,
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: const Color(0xFFE4ECF6)),
+        boxShadow: [
+          BoxShadow(
+            color: const Color(0xFF234D79).withValues(alpha: 0.10),
+            blurRadius: 14,
+            offset: const Offset(0, 7),
+          ),
+        ],
+      ),
+      child: Icon(icon, color: AppColors.primary),
     );
   }
 }
@@ -286,46 +763,6 @@ class _SearchLocationBar extends StatelessWidget {
   }
 }
 
-class _SectionTitle extends StatelessWidget {
-  const _SectionTitle({
-    required this.title,
-    required this.actionLabel,
-    required this.onAction,
-  });
-
-  final String title;
-  final String actionLabel;
-  final VoidCallback onAction;
-
-  @override
-  Widget build(BuildContext context) {
-    return Row(
-      children: [
-        Expanded(
-          child: Text(
-            title,
-            style: const TextStyle(
-              color: Color(0xFF07143D),
-              fontSize: 19,
-              fontWeight: FontWeight.w900,
-            ),
-          ),
-        ),
-        TextButton(
-          onPressed: onAction,
-          child: Text(
-            actionLabel,
-            style: const TextStyle(
-              color: Color(0xFF006FE6),
-              fontWeight: FontWeight.w900,
-            ),
-          ),
-        ),
-      ],
-    );
-  }
-}
-
 class _CategoryGrid extends StatelessWidget {
   const _CategoryGrid({required this.categories});
 
@@ -354,7 +791,7 @@ class _CategoryGrid extends StatelessWidget {
         final category = visible[index];
         return Container(
           decoration: _softDecoration(radius: 16),
-          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 13),
+          padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 12),
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
@@ -374,7 +811,9 @@ class _CategoryGrid extends StatelessWidget {
               ),
               const SizedBox(height: 4),
               Text(
-                _categorySubtitle(category.name),
+                category.description?.trim().isNotEmpty == true
+                    ? category.description!.trim()
+                    : _categorySubtitle(category.name),
                 maxLines: 2,
                 overflow: TextOverflow.ellipsis,
                 textAlign: TextAlign.center,
@@ -406,7 +845,11 @@ class _CategoryIcon extends StatelessWidget {
       height: 52,
       padding: const EdgeInsets.all(8),
       decoration: BoxDecoration(
-        color: const Color(0xFFEAF4FF),
+        gradient: const LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [Color(0xFFEAF4FF), Color(0xFFFFF4E7)],
+        ),
         borderRadius: BorderRadius.circular(16),
       ),
       child: iconUrl == null || iconUrl.isEmpty
@@ -437,9 +880,10 @@ class _TechnicianStrip extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return SizedBox(
-      height: 178,
+      height: 204,
       child: ListView.separated(
         scrollDirection: Axis.horizontal,
+        padding: const EdgeInsets.only(right: 4),
         itemCount: technicians.take(6).length,
         separatorBuilder: (_, _) => const SizedBox(width: 12),
         itemBuilder: (context, index) {
@@ -469,15 +913,15 @@ class _TechnicianCard extends StatelessWidget {
         ? 'Spesialis Teknisi'
         : 'Spesialis ${technician.skills.take(2).join(' & ')}';
     return SizedBox(
-      width: 205,
+      width: 218,
       child: Material(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(20),
         child: InkWell(
-          borderRadius: BorderRadius.circular(16),
+          borderRadius: BorderRadius.circular(20),
           onTap: onTap,
           child: Container(
-            decoration: _softDecoration(radius: 16),
+            decoration: _softDecoration(radius: 20),
             padding: const EdgeInsets.all(12),
             child: Column(
               children: [
@@ -489,9 +933,9 @@ class _TechnicianCard extends StatelessWidget {
                         Container(
                           width: 64,
                           height: 64,
-                          decoration: const BoxDecoration(
-                            color: Color(0xFFE3EEF9),
-                            shape: BoxShape.circle,
+                          decoration: BoxDecoration(
+                            color: AppColors.primary.withValues(alpha: 0.10),
+                            borderRadius: BorderRadius.circular(20),
                           ),
                           child: const Icon(
                             Icons.engineering_rounded,
@@ -580,13 +1024,13 @@ class _TechnicianCard extends StatelessWidget {
                     vertical: 4,
                   ),
                   decoration: BoxDecoration(
-                    color: const Color(0xFFEAF4FF),
-                    borderRadius: BorderRadius.circular(8),
+                    color: AppColors.accent.withValues(alpha: 0.14),
+                    borderRadius: BorderRadius.circular(999),
                   ),
                   child: Text(
                     technician.serviceArea,
                     style: const TextStyle(
-                      color: Color(0xFF0964CC),
+                      color: Color(0xFF9B5A12),
                       fontSize: 12,
                       fontWeight: FontWeight.w800,
                     ),
@@ -606,12 +1050,12 @@ class _TechnicianCard extends StatelessWidget {
                         ),
                       ),
                     ),
-                    Text(
-                      technician.completedJobs > 0 ? 'Rp75.000' : 'Rp100.000',
-                      style: const TextStyle(
+                    const Text(
+                      'Lihat detail',
+                      style: TextStyle(
                         color: Color(0xFF006FE6),
-                        fontSize: 17,
-                        fontWeight: FontWeight.w900,
+                        fontSize: 13,
+                        fontWeight: FontWeight.w800,
                       ),
                     ),
                   ],
@@ -696,59 +1140,176 @@ class _PromoBanner extends StatelessWidget {
   }
 }
 
-class _OrderPrompt extends StatelessWidget {
-  const _OrderPrompt({required this.activeOrders});
+class _CustomerOrderPreview extends StatelessWidget {
+  const _CustomerOrderPreview({required this.order});
 
-  final int activeOrders;
+  final OrderSummary order;
 
   @override
   Widget build(BuildContext context) {
+    final total = order.finalTotal > 0
+        ? order.finalTotal
+        : order.estimatedTotal;
     return Container(
       padding: const EdgeInsets.all(16),
-      decoration: _softDecoration(radius: 18),
+      decoration: _softDecoration(radius: 20),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              StatusPill(
+                label: orderStatusLabel(order.status),
+                color: orderStatusColor(order.status),
+              ),
+              const Spacer(),
+              Text(
+                order.orderNumber,
+                style: const TextStyle(
+                  color: AppColors.textSecondary,
+                  fontSize: 12,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 14),
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Container(
+                width: 58,
+                height: 58,
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    colors: [
+                      const Color(0xFFEAF4FF),
+                      AppColors.primary.withValues(alpha: 0.12),
+                    ],
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                  ),
+                  borderRadius: BorderRadius.circular(16),
+                ),
+                child: Icon(
+                  categoryIcon(order.problemDescription),
+                  color: AppColors.primary,
+                  size: 32,
+                ),
+              ),
+              const SizedBox(width: 13),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      order.problemDescription.isEmpty
+                          ? 'Permintaan Layanan'
+                          : order.problemDescription,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        color: AppColors.textPrimary,
+                        fontSize: 16,
+                        fontWeight: FontWeight.w900,
+                        letterSpacing: 0,
+                      ),
+                    ),
+                    const SizedBox(height: 6),
+                    _PreviewMeta(
+                      icon: Icons.engineering_outlined,
+                      text: 'Teknisi: ${order.technicianName}',
+                    ),
+                    _PreviewMeta(
+                      icon: Icons.calendar_today_outlined,
+                      text:
+                          '${order.scheduleDate} ${_shortTime(order.scheduleTime)}',
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          Row(
+            children: [
+              Expanded(
+                child: Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 10,
+                    vertical: 8,
+                  ),
+                  decoration: BoxDecoration(
+                    color: AppColors.primary.withValues(alpha: 0.08),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: const Row(
+                    children: [
+                      Icon(
+                        Icons.info_outline_rounded,
+                        size: 14,
+                        color: AppColors.primary,
+                      ),
+                      SizedBox(width: 5),
+                      Expanded(
+                        child: Text(
+                          'Pantau progres pesanan',
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(
+                            color: AppColors.primary,
+                            fontSize: 12,
+                            fontWeight: FontWeight.w800,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+              const SizedBox(width: 10),
+              Text(
+                formatRupiah(total),
+                style: const TextStyle(
+                  color: AppColors.primary,
+                  fontSize: 17,
+                  fontWeight: FontWeight.w900,
+                  letterSpacing: 0,
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _PreviewMeta extends StatelessWidget {
+  const _PreviewMeta({required this.icon, required this.text});
+
+  final IconData icon;
+  final String text;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.only(top: 4),
       child: Row(
         children: [
-          Container(
-            width: 52,
-            height: 52,
-            decoration: const BoxDecoration(
-              color: Color(0xFF0876ED),
-              shape: BoxShape.circle,
-            ),
-            child: const Icon(Icons.assignment_rounded, color: Colors.white),
-          ),
-          const SizedBox(width: 14),
+          Icon(icon, color: AppColors.textSecondary, size: 16),
+          const SizedBox(width: 5),
           Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Text(
-                  'Pesanan aktif',
-                  style: TextStyle(
-                    color: Color(0xFF07143D),
-                    fontSize: 15,
-                    fontWeight: FontWeight.w900,
-                  ),
-                ),
-                const SizedBox(height: 5),
-                Text(
-                  activeOrders == 0
-                      ? 'Belum ada pesanan aktif. Pilih teknisi untuk mulai memesan.'
-                      : '$activeOrders pesanan sedang berjalan. Pantau statusnya di menu Pesanan.',
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(
-                    color: Color(0xFF59657C),
-                    fontSize: 12,
-                    height: 1.25,
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-              ],
+            child: Text(
+              text,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: const TextStyle(
+                color: AppColors.textSecondary,
+                fontSize: 12,
+                fontWeight: FontWeight.w600,
+              ),
             ),
           ),
-          const SizedBox(width: 10),
-          const Icon(Icons.chevron_right_rounded, color: Color(0xFF0876ED)),
         ],
       ),
     );
@@ -781,10 +1342,17 @@ String _categorySubtitle(String name) {
   return 'Servis &\nPerbaikan';
 }
 
-String _firstName(String name) {
-  final trimmed = name.trim();
-  if (trimmed.isEmpty) return 'Selamat Datang';
-  return trimmed.split(RegExp(r'\s+')).first;
+String _initials(String name) {
+  final parts = name.trim().split(RegExp(r'\s+'));
+  if (parts.isEmpty || parts.first.isEmpty) return 'C';
+  final first = parts.first.substring(0, 1);
+  if (parts.length == 1 || parts.last.isEmpty) return first.toUpperCase();
+  return '$first${parts.last.substring(0, 1)}'.toUpperCase();
+}
+
+String _shortTime(String value) {
+  if (value.length >= 5) return value.substring(0, 5);
+  return value;
 }
 
 class _CustomerHomeData {

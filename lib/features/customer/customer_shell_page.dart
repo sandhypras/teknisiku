@@ -9,6 +9,7 @@ import '../../shared/mobile_ui.dart';
 import 'customer_home_page.dart';
 import 'customer_orders_page.dart';
 import 'customer_profile_page.dart';
+import 'customer_services_page.dart';
 
 class CustomerShellPage extends StatefulWidget {
   const CustomerShellPage({
@@ -31,7 +32,12 @@ class _CustomerShellPageState extends State<CustomerShellPage> {
   Widget build(BuildContext context) {
     final repo = MarketplaceRepository(Supabase.instance.client);
     final pages = [
-      CustomerHomePage(profile: widget.profile, repo: repo),
+      CustomerHomePage(
+        profile: widget.profile,
+        repo: repo,
+        onGoToOrders: () => setState(() => _index = 2),
+      ),
+      CustomerServicesPage(repo: repo),
       CustomerOrdersPage(repo: repo),
       CustomerProfilePage(
         profile: widget.profile,
@@ -48,7 +54,12 @@ class _CustomerShellPageState extends State<CustomerShellPage> {
           NavigationDestination(
             icon: Icon(Icons.home_outlined),
             selectedIcon: Icon(Icons.home_rounded),
-            label: 'Home',
+            label: 'Beranda',
+          ),
+          NavigationDestination(
+            icon: Icon(Icons.home_repair_service_outlined),
+            selectedIcon: Icon(Icons.home_repair_service_rounded),
+            label: 'Layanan',
           ),
           NavigationDestination(
             icon: Icon(Icons.receipt_long_outlined),
@@ -58,7 +69,7 @@ class _CustomerShellPageState extends State<CustomerShellPage> {
           NavigationDestination(
             icon: Icon(Icons.person_outline_rounded),
             selectedIcon: Icon(Icons.person_rounded),
-            label: 'Profil',
+            label: 'Profile',
           ),
         ],
       ),

@@ -10,7 +10,7 @@ import '../features/auth/register_customer_page.dart';
 import '../features/auth/register_technician_page.dart';
 import '../features/admin/admin_shell.dart';
 import '../features/customer/customer_shell_page.dart';
-import '../features/guest/home_page.dart';
+import '../features/onboarding/onboarding_page.dart';
 import '../features/technician/technician_shell_page.dart';
 import 'theme.dart';
 
@@ -55,6 +55,7 @@ class AuthGate extends StatefulWidget {
 class _AuthGateState extends State<AuthGate> {
   late Future<AppProfile?> _profileFuture = widget.authService.currentProfile();
   String? _profileUserId;
+  var _showLoginMenu = false;
 
   void _reloadProfile() {
     setState(() {
@@ -71,7 +72,12 @@ class _AuthGateState extends State<AuthGate> {
         final session = widget.authService.currentSession;
         if (session == null) {
           _profileUserId = null;
-          return const GuestHomePage();
+          if (!_showLoginMenu) {
+            return OnboardingPage(
+              onContinue: () => setState(() => _showLoginMenu = true),
+            );
+          }
+          return const LoginMenuPage();
         }
         if (_profileUserId != session.user.id) {
           _profileUserId = session.user.id;
