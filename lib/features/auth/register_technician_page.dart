@@ -18,7 +18,6 @@ class _RegisterTechnicianPageState extends State<RegisterTechnicianPage> {
   final _email = TextEditingController();
   final _password = TextEditingController();
   final _phone = TextEditingController();
-  final _address = TextEditingController();
   final _skills = TextEditingController();
   final _experience = TextEditingController();
   final _description = TextEditingController();
@@ -42,7 +41,6 @@ class _RegisterTechnicianPageState extends State<RegisterTechnicianPage> {
     _email.dispose();
     _password.dispose();
     _phone.dispose();
-    _address.dispose();
     _skills.dispose();
     _experience.dispose();
     _description.dispose();
@@ -63,7 +61,7 @@ class _RegisterTechnicianPageState extends State<RegisterTechnicianPage> {
         phone: _phone.text.trim(),
       );
       await _repo.upsertTechnicianProfile(
-        address: _address.text.trim(),
+        address: '-',
         experience: _experience.text.trim(),
         skills: _skills.text.trim(),
         serviceArea: 'Solo',
@@ -196,13 +194,6 @@ class _RegisterTechnicianPageState extends State<RegisterTechnicianPage> {
                         icon: Icons.phone_outlined,
                         keyboardType: TextInputType.phone,
                         validator: _required('Nomor telepon'),
-                      ),
-                      _TechRegisterField(
-                        controller: _address,
-                        hint: 'Alamat',
-                        icon: Icons.location_on_outlined,
-                        maxLines: 2,
-                        validator: _required('Alamat'),
                       ),
                       _TechRegisterField(
                         controller: _skills,

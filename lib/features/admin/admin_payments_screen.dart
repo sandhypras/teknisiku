@@ -32,7 +32,7 @@ class _AdminPaymentsScreenState extends State<AdminPaymentsScreen> {
     final q = Supabase.instance.client
         .from('payments')
         .select(
-          'id, payment_method, amount, proof_url, payment_status, paid_at, created_at, order:orders!order_id(order_number, customer:profiles!customer_id(full_name), technician:technician_profiles!technician_id(profile:profiles!user_id(full_name)))',
+          'id, payment_method, amount, proof_url, payment_status, paid_at, created_at, midtrans_order_id, transaction_id, fraud_status, snap_redirect_url, order:orders!order_id(order_number, customer:profiles!customer_id(full_name), technician:technician_profiles!technician_id(profile:profiles!user_id(full_name)))',
         );
     final data = status == null
         ? await q.order('created_at', ascending: false).limit(80)
@@ -170,6 +170,15 @@ class _AdminPaymentsScreenState extends State<AdminPaymentsScreen> {
                 _methodLabel(data['payment_method'] as String?),
               ),
               _DetailLine('Status', data['payment_status'] as String? ?? '-'),
+              _DetailLine(
+                'Midtrans Order ID',
+                data['midtrans_order_id'] as String? ?? '-',
+              ),
+              _DetailLine(
+                'Transaction ID',
+                data['transaction_id'] as String? ?? '-',
+              ),
+              _DetailLine('Fraud', data['fraud_status'] as String? ?? '-'),
               _DetailLine(
                 'Amount',
                 formatRupiah((data['amount'] as num?)?.toDouble() ?? 0),
@@ -473,6 +482,11 @@ class _PaymentCard extends StatelessWidget {
                 icon: Icons.credit_card_rounded,
                 label: _methodLabel(data['payment_method'] as String?),
               ),
+              if ((data['midtrans_order_id'] as String?)?.isNotEmpty == true)
+                const AdminInfoChip(
+                  icon: Icons.verified_rounded,
+                  label: 'Midtrans Sandbox',
+                ),
               if ((data['proof_url'] as String?)?.isNotEmpty == true)
                 const AdminInfoChip(
                   icon: Icons.attachment_rounded,

@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
+import 'package:image_picker/image_picker.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../app/theme.dart';
 import '../../core/services/auth_service.dart';
-import '../../core/services/marketplace_repository.dart';
 
 class RegisterCustomerPage extends StatefulWidget {
   const RegisterCustomerPage({super.key});
@@ -18,9 +18,9 @@ class _RegisterCustomerPageState extends State<RegisterCustomerPage> {
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
   final _phoneController = TextEditingController();
-  final _addressController = TextEditingController();
   late final AuthService _authService;
-  late final MarketplaceRepository _repo;
+  final _picker = ImagePicker();
+  XFile? _profilePhoto;
   bool _obscurePassword = true;
   bool _loading = false;
   String? _error;
@@ -30,7 +30,6 @@ class _RegisterCustomerPageState extends State<RegisterCustomerPage> {
     super.initState();
     final client = Supabase.instance.client;
     _authService = AuthService(client);
-    _repo = MarketplaceRepository(client);
   }
 
   @override
@@ -39,35 +38,77 @@ class _RegisterCustomerPageState extends State<RegisterCustomerPage> {
     _emailController.dispose();
     _passwordController.dispose();
     _phoneController.dispose();
-    _addressController.dispose();
     super.dispose();
+  }
+
+  Future<void> _pickProfilePhoto() async {
+    final file = await _picker.pickImage(
+      source: ImageSource.gallery,
+      imageQuality: 82,
+      maxWidth: 1200,
+    );
+    if (file != null) setState(() => _profilePhoto = file);
   }
 
   Future<void> _submit() async {
     if (!_formKey.currentState!.validate()) return;
+    if (_profilePhoto == null) {
+      setState(() => _error = 'Foto profil wajib diupload');
+      return;
+    }
     setState(() {
       _loading = true;
       _error = null;
     });
     try {
-      await _authService.registerCustomer(
+      final response = await _authService.registerCustomer(
         email: _emailController.text.trim(),
         password: _passwordController.text,
         fullName: _nameController.text.trim(),
         phone: _phoneController.text.trim(),
       );
-      await _repo.addAddress(
-        label: 'Rumah',
-        recipientName: _nameController.text.trim(),
-        phone: _phoneController.text.trim(),
-        fullAddress: _addressController.text.trim(),
-      );
+      final userId =
+          response.user?.id ?? Supabase.instance.client.auth.currentUser?.id;
+      if (userId == null) throw StateError('User gagal dibuat');
+      final imagePath = await _uploadProfilePhoto(userId, _profilePhoto!);
+      await _saveProfileImage(userId, imagePath);
       if (mounted) Navigator.of(context).popUntil((route) => route.isFirst);
     } catch (error) {
       setState(() => _error = error.toString());
     } finally {
       if (mounted) setState(() => _loading = false);
     }
+  }
+
+  Future<String> _uploadProfilePhoto(String userId, XFile file) async {
+    final extension = _extensionFor(file.name, file.mimeType);
+    final path =
+        '$userId/profile-${DateTime.now().millisecondsSinceEpoch}$extension';
+    await Supabase.instance.client.storage
+        .from('profile-images')
+        .uploadBinary(
+          path,
+          await file.readAsBytes(),
+          fileOptions: FileOptions(
+            contentType: file.mimeType ?? _contentTypeFor(extension),
+            upsert: true,
+          ),
+        );
+    return 'profile-images/$path';
+  }
+
+  Future<void> _saveProfileImage(String userId, String imagePath) async {
+    for (var attempt = 0; attempt < 3; attempt += 1) {
+      final updated = await Supabase.instance.client
+          .from('profiles')
+          .update({'profile_image_url': imagePath})
+          .eq('id', userId)
+          .select('id')
+          .maybeSingle();
+      if (updated != null) return;
+      await Future<void>.delayed(const Duration(milliseconds: 350));
+    }
+    throw StateError('Profil customer belum siap untuk menyimpan foto');
   }
 
   @override
@@ -83,6 +124,7 @@ class _RegisterCustomerPageState extends State<RegisterCustomerPage> {
       submitLabel: 'Daftar Customer',
       onSubmit: _submit,
       children: [
+        _ProfilePhotoPicker(file: _profilePhoto, onPick: _pickProfilePhoto),
         _RegisterField(
           controller: _nameController,
           hint: 'Nama lengkap',
@@ -120,14 +162,74 @@ class _RegisterCustomerPageState extends State<RegisterCustomerPage> {
           keyboardType: TextInputType.phone,
           validator: _required('Nomor telepon'),
         ),
-        _RegisterField(
-          controller: _addressController,
-          hint: 'Alamat lengkap',
-          icon: Icons.location_on_outlined,
-          maxLines: 3,
-          validator: _required('Alamat'),
-        ),
       ],
+    );
+  }
+}
+
+class _ProfilePhotoPicker extends StatelessWidget {
+  const _ProfilePhotoPicker({required this.file, required this.onPick});
+
+  final XFile? file;
+  final VoidCallback onPick;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(14),
+      decoration: _registerCardDecoration(radius: 16),
+      child: Row(
+        children: [
+          Container(
+            width: 62,
+            height: 62,
+            decoration: BoxDecoration(
+              color: const Color(0xFFEAF4FF),
+              borderRadius: BorderRadius.circular(18),
+            ),
+            child: Icon(
+              file == null
+                  ? Icons.person_add_alt_1_rounded
+                  : Icons.check_circle_rounded,
+              color: const Color(0xFF0876ED),
+              size: 30,
+            ),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text(
+                  'Foto profil wajib',
+                  style: TextStyle(
+                    color: Color(0xFF07143D),
+                    fontSize: 15,
+                    fontWeight: FontWeight.w900,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  file == null ? 'Pilih foto wajah customer' : file!.name,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    color: Color(0xFF59657C),
+                    fontSize: 12,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          TextButton.icon(
+            onPressed: onPick,
+            icon: const Icon(Icons.upload_rounded, size: 18),
+            label: Text(file == null ? 'Upload' : 'Ganti'),
+          ),
+        ],
+      ),
     );
   }
 }
@@ -284,7 +386,6 @@ class _RegisterField extends StatelessWidget {
     required this.icon,
     this.keyboardType,
     this.obscureText = false,
-    this.maxLines = 1,
     this.suffix,
     this.validator,
   });
@@ -294,7 +395,6 @@ class _RegisterField extends StatelessWidget {
   final IconData icon;
   final TextInputType? keyboardType;
   final bool obscureText;
-  final int maxLines;
   final Widget? suffix;
   final String? Function(String?)? validator;
 
@@ -306,7 +406,7 @@ class _RegisterField extends StatelessWidget {
         controller: controller,
         keyboardType: keyboardType,
         obscureText: obscureText,
-        maxLines: obscureText ? 1 : maxLines,
+        maxLines: 1,
         validator: validator,
         style: const TextStyle(
           color: Color(0xFF07143D),
@@ -450,6 +550,26 @@ String? _passwordValidator(String? value) {
   if (password.isEmpty) return 'Password wajib diisi';
   if (password.length < 6) return 'Password minimal 6 karakter';
   return null;
+}
+
+String _extensionFor(String fileName, String? mimeType) {
+  final lowerName = fileName.toLowerCase();
+  for (final extension in ['.jpg', '.jpeg', '.png', '.webp']) {
+    if (lowerName.endsWith(extension)) return extension;
+  }
+  return switch (mimeType) {
+    'image/png' => '.png',
+    'image/webp' => '.webp',
+    _ => '.jpg',
+  };
+}
+
+String _contentTypeFor(String extension) {
+  return switch (extension.toLowerCase()) {
+    '.png' => 'image/png',
+    '.webp' => 'image/webp',
+    _ => 'image/jpeg',
+  };
 }
 
 BoxDecoration _registerCardDecoration({required double radius}) {

@@ -2,12 +2,15 @@
 
 ## Aplikasi Si Teknisi
 
-**Versi:** 1.0  
-**Jenis proyek:** Project kuliah  
-**Platform:** Flutter Android dan Flutter Web  
-**Backend:** Supabase  
-**Wilayah layanan awal:** Solo  
-**Jumlah anggota tim:** 3 orang
+| Informasi | Nilai |
+| --- | --- |
+| Versi | 1.2 |
+| Tanggal update | 28 Juni 2026 |
+| Jenis proyek | Project kuliah |
+| Platform | Flutter Android, Flutter Web, dan Chrome untuk debug mobile |
+| Backend | Supabase |
+| Wilayah layanan awal | Solo |
+| Jumlah anggota tim | 3 orang |
 
 ---
 
@@ -22,6 +25,29 @@ Teknisi dapat mendaftar, melengkapi data diri, mengajukan verifikasi, menyediaka
 Admin mengakses sistem melalui Flutter Web untuk memverifikasi teknisi, menyetujui layanan, mengelola customer, teknisi, pesanan, pembayaran, ulasan, komisi, dan laporan.
 
 Seluruh aplikasi dikembangkan menggunakan Flutter. Supabase digunakan untuk autentikasi, database, penyimpanan file, dan pengelolaan data backend.
+
+### Update Versi 1.2
+
+PRD versi ini menyesuaikan perubahan implementasi terbaru pada aplikasi:
+
+- Dashboard admin terhubung ke Supabase untuk pengelolaan customer, teknisi, kategori, layanan, pesanan, pembayaran, ulasan, komisi, laporan, dan pengaturan.
+- Admin dapat melakukan CRUD dan melihat detail data utama.
+- Kategori layanan dapat dibuat dari dashboard admin dan memiliki icon gambar yang diunggah ke Supabase Storage.
+- Icon kategori yang diunggah admin ditampilkan pada dashboard admin, home guest, dan home customer.
+- Teknisi dapat mengunggah foto wajah/selfie dan foto KTP untuk verifikasi akun.
+- Dashboard admin dapat melihat dokumen/foto verifikasi teknisi yang diunggah.
+- Teknisi memiliki halaman Order Saya untuk melihat dan mengelola pesanan yang masuk.
+- Form pemesanan customer diperluas sesuai struktur database alamat dan pesanan.
+- Customer dapat memakai lokasi aktif saat ini untuk mengisi koordinat dan alamat layanan.
+- Form pemesanan dapat membuat alamat baru langsung dari halaman order apabila customer tidak memakai alamat tersimpan.
+- Aplikasi menggunakan package `geolocator` untuk mengambil koordinat dan `geocoding` untuk reverse geocoding alamat.
+- Android membutuhkan permission `ACCESS_COARSE_LOCATION` dan `ACCESS_FINE_LOCATION` untuk fitur lokasi aktif.
+- Data alamat baru dari form pemesanan disimpan ke tabel `customer_addresses` dan dipakai sebagai `address_id` pada tabel `orders`.
+- Teknisi dapat menyimpan koordinat lokasi layanan dari lokasi aktif perangkat.
+- Home customer dapat mengurutkan teknisi berdasarkan jarak terdekat dari alamat/lokasi customer.
+- Pembayaran customer diintegrasikan dengan Midtrans Sandbox melalui Supabase Edge Function.
+- Customer dapat membuka halaman Snap Midtrans dari pesanan yang berstatus menunggu pembayaran.
+- Webhook Midtrans memperbarui status pembayaran di Supabase setelah notifikasi diterima.
 
 ---
 
@@ -105,6 +131,7 @@ Customer dapat:
 - Mendaftar dan login
 - Melengkapi profil
 - Menyimpan alamat
+- Menggunakan lokasi aktif saat ini sebagai alamat layanan
 - Melihat layanan
 - Memilih teknisi sendiri
 - Membuat pesanan
@@ -229,6 +256,7 @@ Data teknisi:
 - Alamat
 - Foto profil
 - Foto KTP
+- Foto wajah/selfie
 - Sertifikat
 - Pengalaman kerja
 - Keahlian
@@ -262,6 +290,10 @@ Admin dapat:
 - Menolak teknisi
 - Menonaktifkan teknisi
 - Melihat dokumen teknisi
+- Melihat foto wajah/selfie teknisi
+- Melihat foto KTP teknisi
+- Melihat detail profil teknisi
+- Mengelola data teknisi apabila diperlukan
 
 Setelah disetujui, status teknisi berubah menjadi:
 
@@ -278,10 +310,19 @@ Kategori dibuat dan dikelola oleh admin.
 Data kategori:
 
 - Nama kategori
-- Ikon
+- Icon gambar
 - Deskripsi
 - Status aktif
 - Tanggal dibuat
+
+Icon gambar kategori diunggah oleh admin ke Supabase Storage dan URL/path file disimpan pada kolom `icon_url`.
+
+Icon kategori ditampilkan pada:
+
+- Dashboard admin
+- Home guest
+- Home customer
+- Daftar kategori layanan
 
 Kategori awal:
 
@@ -331,7 +372,7 @@ Customer dapat:
 - Melihat daftar teknisi
 - Melihat teknisi berdasarkan kategori
 - Mencari berdasarkan nama
-- Melihat teknisi yang berada di sekitar wilayah customer
+- Melihat teknisi yang berada di sekitar wilayah customer berdasarkan koordinat lokasi
 - Melihat rating teknisi
 - Melihat jumlah pekerjaan selesai
 - Melihat layanan yang ditawarkan
@@ -373,7 +414,11 @@ Data alamat:
 - Longitude
 - Status alamat utama
 
-Google Maps digunakan untuk memilih titik alamat customer.
+Customer dapat memilih alamat yang sudah tersimpan atau membuat alamat baru pada form pemesanan.
+
+Customer dapat menggunakan lokasi aktif saat ini. Sistem mengambil izin lokasi perangkat, membaca koordinat latitude dan longitude, lalu mencoba mengisi alamat menggunakan reverse geocoding.
+
+Google Maps dapat digunakan untuk memilih titik alamat customer apabila API key tersedia. Pada MVP, pengambilan lokasi aktif menggunakan Geolocator dan Geocoding.
 
 Customer tidak dapat melihat lokasi teknisi secara langsung. Aplikasi tidak menggunakan live tracking.
 
@@ -388,11 +433,32 @@ Data pemesanan:
 - Daftar layanan
 - Deskripsi kerusakan
 - Foto kerusakan
-- Alamat
-- Titik lokasi
+- Alamat layanan
+- Label alamat
+- Nama penerima
+- Nomor telepon penerima
+- Kota
+- Kecamatan
+- Kelurahan
+- Kode pos
+- Titik lokasi latitude dan longitude
 - Tanggal kunjungan
 - Jam kunjungan
 - Catatan tambahan
+
+Form pemesanan customer harus menampilkan ringkasan teknisi, layanan yang dipilih, estimasi total, pilihan alamat tersimpan/alamat baru, tombol gunakan lokasi saat ini, jadwal kunjungan, jam kunjungan, dan deskripsi masalah.
+
+Alur alamat pada form pemesanan:
+
+1. Customer dapat memilih alamat tersimpan.
+2. Customer dapat memilih mode alamat baru.
+3. Pada mode alamat baru, customer mengisi label alamat, nama penerima, nomor HP, alamat lengkap, kota, kecamatan, kelurahan, dan kode pos.
+4. Customer dapat menekan tombol gunakan lokasi saat ini.
+5. Sistem meminta izin lokasi perangkat.
+6. Sistem mengambil latitude dan longitude dari perangkat.
+7. Sistem mencoba melakukan reverse geocoding untuk mengisi alamat.
+8. Alamat baru disimpan ke tabel `customer_addresses`.
+9. Pesanan dibuat dengan `address_id` dari alamat yang dipilih atau alamat baru tersebut.
 
 Pesanan langsung dikirim kepada teknisi tanpa persetujuan admin.
 
@@ -474,6 +540,7 @@ Metode pembayaran:
 
 - Tunai
 - Transfer bank
+- Midtrans Sandbox
 
 Untuk pembayaran tunai:
 
@@ -484,6 +551,14 @@ Untuk pembayaran transfer:
 
 - Customer mengunggah bukti transfer
 - Admin atau teknisi melakukan verifikasi pembayaran
+
+Untuk pembayaran Midtrans Sandbox:
+
+- Customer menekan tombol bayar pada pesanan yang berstatus `waiting_payment`.
+- Aplikasi meminta Snap token melalui Supabase Edge Function `midtrans-create-snap`.
+- Customer diarahkan ke halaman Snap Midtrans Sandbox.
+- Midtrans mengirim notifikasi pembayaran ke Supabase Edge Function `midtrans-webhook`.
+- Webhook memvalidasi signature Midtrans sebelum mengubah status pembayaran.
 
 Status pembayaran:
 
@@ -696,8 +771,9 @@ Teknisi menerima pesanan
 - Pencarian teknisi
 - Detail teknisi
 - Detail layanan
-- Form pemesanan
+- Form pemesanan lengkap
 - Pilih alamat
+- Gunakan lokasi saat ini
 - Pilih jadwal
 - Pesanan saya
 - Detail pesanan
@@ -715,9 +791,12 @@ Teknisi menerima pesanan
 - Status verifikasi
 - Profil teknisi
 - Dokumen teknisi
+- Upload foto wajah/selfie
+- Upload foto KTP
 - Daftar layanan
 - Tambah layanan
 - Edit layanan
+- Order Saya
 - Pesanan masuk
 - Detail pesanan
 - Form diagnosis
@@ -731,18 +810,36 @@ Teknisi menerima pesanan
 - Login admin
 - Dashboard
 - Daftar customer
+- Detail customer
+- CRUD customer
 - Daftar teknisi
 - Detail teknisi
 - Verifikasi teknisi
+- Preview foto wajah/selfie teknisi
+- Preview foto KTP teknisi
+- CRUD teknisi
 - Daftar kategori
+- Tambah kategori
+- Edit kategori
+- Hapus kategori
+- Upload icon kategori
 - Daftar layanan
+- Detail layanan
+- CRUD layanan
 - Persetujuan layanan
 - Daftar pesanan
 - Detail pesanan
+- Edit status pesanan
+- Hapus pesanan
 - Daftar pembayaran
+- Detail pembayaran
+- CRUD pembayaran
 - Daftar ulasan
+- Detail ulasan
+- CRUD ulasan
 - Pengaturan komisi
 - Laporan
+- Pengaturan aplikasi
 
 ---
 
@@ -808,20 +905,66 @@ Komponen utama:
 - Dart
 - Material Design 3
 
+Dependency Flutter utama:
+
+- `supabase_flutter` untuk autentikasi, database, dan storage Supabase
+- `flutter_dotenv` untuk konfigurasi environment
+- `image_picker` untuk upload gambar/dokumen
+- `geolocator` untuk mengambil lokasi aktif perangkat
+- `geocoding` untuk membaca alamat dari koordinat
+
 ### 11.2 Backend
 
 - Supabase Auth
 - Supabase PostgreSQL
 - Supabase Storage
 - Supabase Realtime
+- Supabase Edge Functions untuk integrasi Midtrans
+- Midtrans Snap Sandbox untuk checkout pembayaran
 
 ### 11.3 Maps
 
-- Google Maps Flutter
 - Geolocator
 - Geocoding
+- Google Maps Flutter opsional apabila API key tersedia
 
-### 11.4 State Management
+Pada MVP, fitur lokasi aktif menggunakan Geolocator untuk mengambil koordinat perangkat dan Geocoding untuk membaca alamat dari koordinat.
+
+Permission platform:
+
+- Android: `ACCESS_COARSE_LOCATION`
+- Android: `ACCESS_FINE_LOCATION`
+- Android: `CAMERA`
+
+Permission camera digunakan untuk kebutuhan upload foto/dokumen. Permission lokasi digunakan pada form pemesanan ketika customer memilih opsi gunakan lokasi saat ini.
+
+### 11.4 Storage
+
+Supabase Storage digunakan untuk menyimpan file upload aplikasi.
+
+Bucket utama:
+
+- `profile-images` untuk foto profil dan foto wajah/selfie
+- `technician-documents` untuk dokumen teknisi seperti KTP dan sertifikat
+- `category-images` untuk icon kategori layanan
+- `service-images` untuk foto layanan
+- `order-attachments` untuk lampiran/foto kerusakan dan dokumentasi pekerjaan
+- `payment-proofs` untuk bukti pembayaran
+
+### 11.5 Payment Gateway
+
+Payment gateway yang digunakan pada fase pengembangan adalah Midtrans Sandbox.
+
+Komponen integrasi:
+
+- Edge Function `midtrans-create-snap` untuk membuat transaksi Snap.
+- Edge Function `midtrans-webhook` untuk menerima notifikasi Midtrans.
+- Secret `MIDTRANS_SERVER_KEY` disimpan di Supabase, bukan di Flutter.
+- Kolom Snap dan transaction metadata disimpan pada tabel `payments`.
+
+Flutter client hanya menerima `snap_redirect_url` dan membuka halaman pembayaran melalui browser atau external application.
+
+### 11.6 State Management
 
 Pilihan state management:
 
@@ -830,23 +973,46 @@ Pilihan state management:
 
 Untuk project ini disarankan menggunakan Riverpod atau Provider sesuai kemampuan tim.
 
-### 11.5 Routing
+### 11.7 Routing
 
 - GoRouter
 
-### 11.6 Struktur Repository
+Route utama mengikuti role pengguna:
+
+- Guest: home, layanan, detail teknisi, login, register
+- Customer: home, layanan, detail teknisi, form pemesanan, pesanan, profil
+- Teknisi: dashboard, layanan saya, order saya, pesan, akun/profil
+- Admin: dashboard, customer, teknisi, kategori, layanan, pesanan, pembayaran, ulasan, komisi, laporan, pengaturan
+
+### 11.8 Struktur Repository
 
 ```text
-si-teknisi/
-|-- mobile_app/
-|-- admin_web/
+teknisiku/
+|-- android/
+|-- assets/
+|-- documentation/
+|   `-- PRD.md
+|-- lib/
+|   |-- core/
+|   |-- features/
+|   |   |-- admin/
+|   |   |-- auth/
+|   |   |-- customer/
+|   |   |-- guest/
+|   |   `-- technician/
+|   |-- shared/
+|   `-- main.dart
 |-- supabase/
 |   |-- migrations/
 |   |-- policies/
-|   `-- seed.sql
-|-- documentation/
+|   `-- README.md
+|-- web/
+|-- windows/
+|-- pubspec.yaml
 `-- README.md
 ```
+
+Mobile, admin web, guest, customer, dan teknisi berada dalam satu project Flutter dengan pemisahan fitur di dalam folder `lib/features`.
 
 ---
 
@@ -904,6 +1070,8 @@ address
 experience
 skills
 service_area
+latitude
+longitude
 description
 verification_status
 verified_at
@@ -925,6 +1093,8 @@ created_at
 updated_at
 ```
 
+Kolom `icon_url` menyimpan path atau public URL gambar icon kategori dari Supabase Storage bucket `category-images`.
+
 ### 12.4 Services
 
 Kolom:
@@ -943,7 +1113,58 @@ created_at
 updated_at
 ```
 
-### 12.5 Orders
+### 12.5 Technician Documents
+
+Kolom:
+
+```text
+id
+technician_id
+document_type
+file_url
+uploaded_at
+```
+
+Nilai `document_type` yang digunakan:
+
+```text
+selfie
+ktp
+certificate
+experience
+skill
+service_area
+```
+
+File dokumen teknisi disimpan pada Supabase Storage bucket `technician-documents`.
+
+### 12.6 Customer Addresses
+
+Kolom:
+
+```text
+id
+customer_id
+label
+recipient_name
+phone
+full_address
+city
+district
+village
+postal_code
+latitude
+longitude
+is_primary
+created_at
+updated_at
+```
+
+Kolom `latitude` dan `longitude` diisi ketika customer menggunakan lokasi aktif saat ini atau memilih titik alamat.
+
+Alamat yang dibuat dari form pemesanan disimpan dengan `is_primary = false` secara default agar tidak otomatis mengganti alamat utama customer.
+
+### 12.7 Orders
 
 Kolom:
 
@@ -966,7 +1187,9 @@ created_at
 updated_at
 ```
 
-### 12.6 Order Items
+Kolom `address_id` mengarah ke tabel `customer_addresses`. Jika customer memakai lokasi aktif saat ini dan membuat alamat baru saat checkout, maka `address_id` menggunakan ID alamat baru yang dibuat sebelum order disimpan.
+
+### 12.8 Order Items
 
 Kolom:
 
@@ -980,7 +1203,7 @@ final_price
 created_at
 ```
 
-### 12.7 Diagnoses
+### 12.9 Diagnoses
 
 Kolom:
 
@@ -997,7 +1220,7 @@ created_at
 updated_at
 ```
 
-### 12.8 Payments
+### 12.10 Payments
 
 Kolom:
 
@@ -1009,11 +1232,17 @@ amount
 proof_url
 payment_status
 paid_at
+midtrans_order_id
+snap_token
+snap_redirect_url
+transaction_id
+fraud_status
+raw_response
 created_at
 updated_at
 ```
 
-### 12.9 Reviews
+### 12.11 Reviews
 
 Kolom:
 
@@ -1028,7 +1257,7 @@ image_url
 created_at
 ```
 
-### 12.10 Warranties
+### 12.12 Warranties
 
 Kolom:
 
@@ -1066,6 +1295,11 @@ created_at
 18. Aplikasi tidak menyediakan fitur chat.
 19. Aplikasi tidak menyediakan live tracking.
 20. Admin tidak dapat memilihkan teknisi untuk customer.
+21. Admin dapat membuat, melihat, memperbarui, dan menghapus data master seperti kategori, layanan, customer, teknisi, pesanan, pembayaran, dan ulasan sesuai kebutuhan operasional.
+22. Icon kategori harus berasal dari data kategori di database agar tampilan home customer dan guest mengikuti perubahan dashboard admin.
+23. Teknisi wajib menyediakan foto wajah/selfie dan foto KTP untuk proses verifikasi.
+24. Dokumen verifikasi teknisi hanya dapat dilihat oleh teknisi pemilik akun dan admin.
+25. Customer dapat menggunakan lokasi aktif saat ini untuk mengisi alamat layanan, tetapi tidak dapat melihat lokasi teknisi secara real-time.
 
 ---
 
@@ -1086,17 +1320,23 @@ Karena aplikasi ditargetkan memiliki versi demo dalam satu hari, fitur MVP dipri
 - Penambahan layanan
 - Persetujuan layanan
 - Pembuatan pesanan
+- Form pemesanan lengkap dengan alamat dan jadwal
+- Penggunaan lokasi aktif saat ini pada form pemesanan
 - Daftar pesanan customer
 - Daftar pesanan teknisi
+- Halaman Order Saya teknisi
 - Terima atau tolak pesanan
 - Perubahan status pesanan
+- CRUD dashboard admin untuk data utama
+- Upload icon kategori dari dashboard admin
+- Preview dokumen teknisi pada dashboard admin
 
 ### Penyederhanaan MVP
 
 Untuk versi demo:
 
-- Alamat dapat menggunakan input teks
-- Google Maps dapat ditambahkan setelah alur utama berjalan
+- Alamat dapat menggunakan input teks dan lokasi aktif perangkat
+- Google Maps visual dapat ditambahkan setelah alur utama berjalan
 - Pembayaran dapat menggunakan status manual
 - Invoice cukup berupa halaman digital
 - Upload video tidak wajib
@@ -1194,16 +1434,23 @@ technician-admin
 
 - Teknisi dapat melengkapi profil.
 - Teknisi dapat mengunggah dokumen.
+- Teknisi dapat mengunggah foto wajah/selfie.
+- Teknisi dapat mengunggah foto KTP.
 - Admin dapat memverifikasi teknisi.
 - Teknisi terverifikasi dapat membuat layanan.
 - Teknisi dapat menerima atau menolak pesanan.
+- Teknisi dapat melihat daftar Order Saya.
 
 ### Customer
 
 - Customer dapat melihat kategori.
+- Customer dapat melihat icon kategori yang dibuat admin.
 - Customer dapat melihat teknisi.
 - Customer dapat memilih layanan.
 - Customer dapat membuat pesanan.
+- Customer dapat membuat pesanan dengan alamat tersimpan.
+- Customer dapat membuat pesanan dengan alamat baru.
+- Customer dapat menggunakan lokasi aktif saat ini pada form pemesanan.
 - Customer dapat melihat status pesanan.
 
 ### Admin
@@ -1211,8 +1458,13 @@ technician-admin
 - Admin dapat login melalui Flutter Web.
 - Admin dapat melihat teknisi pending.
 - Admin dapat menyetujui atau menolak teknisi.
+- Admin dapat melihat foto wajah/selfie dan foto KTP teknisi.
 - Admin dapat menyetujui atau menolak layanan.
 - Admin dapat melihat seluruh pesanan.
+- Admin dapat melakukan CRUD kategori.
+- Admin dapat mengunggah icon kategori.
+- Admin dapat melakukan CRUD customer, teknisi, layanan, pesanan, pembayaran, dan ulasan.
+- Admin dapat melihat laporan dan ringkasan data dashboard.
 
 ### Order
 
@@ -1250,10 +1502,33 @@ technician-admin
 2. Customer memilih kategori.
 3. Customer memilih teknisi.
 4. Customer memilih layanan.
-5. Customer mengisi data kerusakan.
-6. Customer mengirim pesanan.
-7. Teknisi menerima pesanan.
-8. Customer melihat perubahan status.
+5. Customer memilih alamat tersimpan atau membuat alamat baru.
+6. Customer dapat menekan gunakan lokasi saat ini untuk mengisi koordinat.
+7. Customer mengisi jadwal dan data kerusakan.
+8. Customer mengirim pesanan.
+9. Pesanan tersimpan di Supabase.
+10. Teknisi menerima pesanan.
+11. Customer melihat perubahan status.
+
+### Skenario 3A: Pengelolaan Kategori Admin
+
+1. Admin login ke dashboard web.
+2. Admin membuka halaman kategori.
+3. Admin menambahkan kategori baru.
+4. Admin mengunggah icon kategori.
+5. Data kategori tersimpan di Supabase.
+6. Icon kategori tampil pada dashboard admin.
+7. Icon kategori tampil pada home guest dan customer.
+
+### Skenario 3B: Verifikasi Dokumen Teknisi
+
+1. Teknisi login.
+2. Teknisi membuka halaman profil/verifikasi.
+3. Teknisi mengunggah foto wajah/selfie.
+4. Teknisi mengunggah foto KTP.
+5. Admin membuka detail teknisi.
+6. Admin melihat dokumen yang diunggah.
+7. Admin menyetujui atau menolak verifikasi teknisi.
 
 ### Skenario 4: Penyelesaian Pekerjaan
 
@@ -1355,4 +1630,4 @@ Si Teknisi merupakan aplikasi marketplace jasa teknisi berbasis Flutter dan Supa
 
 Aplikasi memiliki tiga role utama, yaitu customer, teknisi, dan admin, serta akses guest untuk pengguna yang belum login.
 
-Versi MVP difokuskan pada autentikasi, verifikasi teknisi, pengelolaan layanan, pemesanan, dan perubahan status pesanan. Fitur tambahan seperti pembayaran lengkap, garansi, rating, Google Maps, invoice, dan laporan dapat dikembangkan setelah alur utama berjalan dengan baik.
+Versi MVP difokuskan pada autentikasi, verifikasi teknisi, pengelolaan layanan, pemesanan, lokasi aktif customer, dashboard admin CRUD, dan perubahan status pesanan. Fitur tambahan seperti payment gateway, live tracking, chat, dan laporan analitik kompleks dapat dikembangkan setelah alur utama berjalan dengan baik.

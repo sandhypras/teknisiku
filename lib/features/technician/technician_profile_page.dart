@@ -4,6 +4,7 @@ import 'package:image_picker/image_picker.dart';
 import '../../app/theme.dart';
 import '../../core/models/mobile_models.dart';
 import '../../core/services/auth_service.dart';
+import '../../core/services/location_service.dart';
 import '../../core/services/marketplace_repository.dart';
 import '../../shared/mobile_ui.dart';
 
@@ -408,143 +409,229 @@ class _TechnicianProfilePageState extends State<TechnicianProfilePage> {
     final description = TextEditingController(
       text: technician?.description ?? '',
     );
+    var latitude = technician?.latitude;
+    var longitude = technician?.longitude;
+    var locating = false;
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
-      builder: (context) => Padding(
-        padding: EdgeInsets.fromLTRB(
-          16,
-          0,
-          16,
-          MediaQuery.viewInsetsOf(context).bottom + 16,
-        ),
-        child: Container(
-          decoration: const BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
+      builder: (context) => StatefulBuilder(
+        builder: (context, setSheetState) => Padding(
+          padding: EdgeInsets.fromLTRB(
+            16,
+            0,
+            16,
+            MediaQuery.viewInsetsOf(context).bottom + 16,
           ),
-          padding: const EdgeInsets.fromLTRB(20, 14, 20, 20),
-          child: ListView(
-            shrinkWrap: true,
-            children: [
-              Center(
-                child: Container(
-                  width: 42,
-                  height: 5,
-                  margin: const EdgeInsets.only(bottom: 18),
-                  decoration: BoxDecoration(
-                    color: const Color(0xFFE4ECF6),
-                    borderRadius: BorderRadius.circular(10),
+          child: Container(
+            decoration: const BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
+            ),
+            padding: const EdgeInsets.fromLTRB(20, 14, 20, 20),
+            child: ListView(
+              shrinkWrap: true,
+              children: [
+                Center(
+                  child: Container(
+                    width: 42,
+                    height: 5,
+                    margin: const EdgeInsets.only(bottom: 18),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFE4ECF6),
+                      borderRadius: BorderRadius.circular(10),
+                    ),
                   ),
                 ),
-              ),
-              Row(
-                children: [
-                  Container(
-                    width: 44,
-                    height: 44,
-                    decoration: BoxDecoration(
-                      gradient: const LinearGradient(
-                        colors: [AppColors.primary, Color(0xFF4F8FE0)],
-                        begin: Alignment.topLeft,
-                        end: Alignment.bottomRight,
+                Row(
+                  children: [
+                    Container(
+                      width: 44,
+                      height: 44,
+                      decoration: BoxDecoration(
+                        gradient: const LinearGradient(
+                          colors: [AppColors.primary, Color(0xFF4F8FE0)],
+                          begin: Alignment.topLeft,
+                          end: Alignment.bottomRight,
+                        ),
+                        borderRadius: BorderRadius.circular(14),
                       ),
+                      child: const Icon(
+                        Icons.badge_rounded,
+                        color: Colors.white,
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    const Expanded(
+                      child: Text(
+                        'Profil teknisi',
+                        style: TextStyle(
+                          color: AppColors.textPrimary,
+                          fontSize: 21,
+                          fontWeight: FontWeight.w900,
+                          letterSpacing: -0.2,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 20),
+                _ProfileField(
+                  controller: address,
+                  label: 'Alamat',
+                  icon: Icons.home_rounded,
+                ),
+                const SizedBox(height: 14),
+                _ProfileField(
+                  controller: skills,
+                  label: 'Keahlian, pisahkan koma',
+                  icon: Icons.build_rounded,
+                ),
+                const SizedBox(height: 14),
+                _ProfileField(
+                  controller: experience,
+                  label: 'Pengalaman',
+                  icon: Icons.business_center_rounded,
+                  maxLines: 2,
+                ),
+                const SizedBox(height: 14),
+                _ProfileField(
+                  controller: area,
+                  label: 'Area layanan',
+                  icon: Icons.location_on_rounded,
+                ),
+                const SizedBox(height: 10),
+                OutlinedButton.icon(
+                  onPressed: locating
+                      ? null
+                      : () async {
+                          setSheetState(() => locating = true);
+                          try {
+                            final location = await getCurrentAddress();
+                            address.text = location.fullAddress;
+                            area.text =
+                                [
+                                      location.village,
+                                      location.district,
+                                      location.city,
+                                    ]
+                                    .where(
+                                      (item) =>
+                                          item != null &&
+                                          item.trim().isNotEmpty,
+                                    )
+                                    .join(', ');
+                            latitude = location.latitude;
+                            longitude = location.longitude;
+                            setSheetState(() {});
+                          } catch (error) {
+                            if (!context.mounted) return;
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(content: Text(error.toString())),
+                            );
+                          } finally {
+                            setSheetState(() => locating = false);
+                          }
+                        },
+                  icon: locating
+                      ? const SizedBox(
+                          width: 17,
+                          height: 17,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        )
+                      : const Icon(Icons.my_location_rounded),
+                  label: Text(
+                    locating
+                        ? 'Mengambil lokasi...'
+                        : 'Gunakan lokasi saat ini',
+                  ),
+                ),
+                if (latitude != null && longitude != null) ...[
+                  const SizedBox(height: 10),
+                  Container(
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: AppColors.primary.withValues(alpha: 0.08),
                       borderRadius: BorderRadius.circular(14),
                     ),
-                    child: const Icon(Icons.badge_rounded, color: Colors.white),
-                  ),
-                  const SizedBox(width: 12),
-                  const Expanded(
-                    child: Text(
-                      'Profil teknisi',
-                      style: TextStyle(
-                        color: AppColors.textPrimary,
-                        fontSize: 21,
-                        fontWeight: FontWeight.w900,
-                        letterSpacing: -0.2,
-                      ),
+                    child: Row(
+                      children: [
+                        const Icon(
+                          Icons.near_me_rounded,
+                          color: AppColors.primary,
+                          size: 18,
+                        ),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            '${latitude!.toStringAsFixed(6)}, ${longitude!.toStringAsFixed(6)}',
+                            style: const TextStyle(
+                              color: AppColors.textPrimary,
+                              fontSize: 12,
+                              fontWeight: FontWeight.w800,
+                            ),
+                          ),
+                        ),
+                      ],
                     ),
                   ),
                 ],
-              ),
-              const SizedBox(height: 20),
-              _ProfileField(
-                controller: address,
-                label: 'Alamat',
-                icon: Icons.home_rounded,
-              ),
-              const SizedBox(height: 14),
-              _ProfileField(
-                controller: skills,
-                label: 'Keahlian, pisahkan koma',
-                icon: Icons.build_rounded,
-              ),
-              const SizedBox(height: 14),
-              _ProfileField(
-                controller: experience,
-                label: 'Pengalaman',
-                icon: Icons.business_center_rounded,
-                maxLines: 2,
-              ),
-              const SizedBox(height: 14),
-              _ProfileField(
-                controller: area,
-                label: 'Area layanan',
-                icon: Icons.location_on_rounded,
-              ),
-              const SizedBox(height: 14),
-              _ProfileField(
-                controller: description,
-                label: 'Deskripsi',
-                icon: Icons.notes_rounded,
-                maxLines: 3,
-              ),
-              const SizedBox(height: 22),
-              SizedBox(
-                height: 54,
-                child: DecoratedBox(
-                  decoration: BoxDecoration(
-                    borderRadius: BorderRadius.circular(14),
-                    gradient: const LinearGradient(
-                      colors: [AppColors.primary, Color(0xFF4F8FE0)],
-                      begin: Alignment.centerLeft,
-                      end: Alignment.centerRight,
-                    ),
-                  ),
-                  child: FilledButton(
-                    style: FilledButton.styleFrom(
-                      backgroundColor: Colors.transparent,
-                      shadowColor: Colors.transparent,
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(14),
+                const SizedBox(height: 14),
+                _ProfileField(
+                  controller: description,
+                  label: 'Deskripsi',
+                  icon: Icons.notes_rounded,
+                  maxLines: 3,
+                ),
+                const SizedBox(height: 22),
+                SizedBox(
+                  height: 54,
+                  child: DecoratedBox(
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(14),
+                      gradient: const LinearGradient(
+                        colors: [AppColors.primary, Color(0xFF4F8FE0)],
+                        begin: Alignment.centerLeft,
+                        end: Alignment.centerRight,
                       ),
                     ),
-                    onPressed: () async {
-                      await widget.repo.upsertTechnicianProfile(
-                        address: address.text.trim().isEmpty
-                            ? '-'
-                            : address.text.trim(),
-                        experience: experience.text.trim(),
-                        skills: skills.text.trim(),
-                        serviceArea: area.text.trim(),
-                        description: description.text.trim(),
-                      );
-                      if (!context.mounted) return;
-                      Navigator.pop(context);
-                      if (mounted) _refresh();
-                    },
-                    child: const Text(
-                      'Simpan Profil',
-                      style: TextStyle(
-                        fontWeight: FontWeight.w900,
-                        fontSize: 16,
+                    child: FilledButton(
+                      style: FilledButton.styleFrom(
+                        backgroundColor: Colors.transparent,
+                        shadowColor: Colors.transparent,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(14),
+                        ),
+                      ),
+                      onPressed: () async {
+                        await widget.repo.upsertTechnicianProfile(
+                          address: address.text.trim().isEmpty
+                              ? '-'
+                              : address.text.trim(),
+                          experience: experience.text.trim(),
+                          skills: skills.text.trim(),
+                          serviceArea: area.text.trim(),
+                          description: description.text.trim(),
+                          latitude: latitude,
+                          longitude: longitude,
+                        );
+                        if (!context.mounted) return;
+                        Navigator.pop(context);
+                        if (mounted) _refresh();
+                      },
+                      child: const Text(
+                        'Simpan Profil',
+                        style: TextStyle(
+                          fontWeight: FontWeight.w900,
+                          fontSize: 16,
+                        ),
                       ),
                     ),
                   ),
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
         ),
       ),

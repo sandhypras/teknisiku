@@ -81,6 +81,9 @@ class TechnicianSummary {
     required this.rating,
     this.description,
     this.experience,
+    this.latitude,
+    this.longitude,
+    this.distanceKm,
   });
 
   final String id;
@@ -94,6 +97,9 @@ class TechnicianSummary {
   final double rating;
   final String? description;
   final String? experience;
+  final double? latitude;
+  final double? longitude;
+  final double? distanceKm;
 
   factory TechnicianSummary.fromJson(Map<String, dynamic> json) {
     final profile = json['profile'] as Map<String, dynamic>? ?? {};
@@ -107,8 +113,30 @@ class TechnicianSummary {
       status: json['verification_status'] as String? ?? 'pending',
       description: json['description'] as String?,
       experience: json['experience'] as String?,
+      latitude: (json['latitude'] as num?)?.toDouble(),
+      longitude: (json['longitude'] as num?)?.toDouble(),
+      distanceKm: (json['distance_km'] as num?)?.toDouble(),
       completedJobs: (json['completed_jobs'] as num?)?.toInt() ?? 0,
       rating: (json['rating'] as num?)?.toDouble() ?? 0,
+    );
+  }
+
+  TechnicianSummary copyWith({double? distanceKm}) {
+    return TechnicianSummary(
+      id: id,
+      userId: userId,
+      name: name,
+      email: email,
+      serviceArea: serviceArea,
+      skills: skills,
+      status: status,
+      completedJobs: completedJobs,
+      rating: rating,
+      description: description,
+      experience: experience,
+      latitude: latitude,
+      longitude: longitude,
+      distanceKm: distanceKm ?? this.distanceKm,
     );
   }
 }
@@ -190,6 +218,11 @@ class CustomerAddress {
     required this.fullAddress,
     required this.city,
     required this.isPrimary,
+    this.district,
+    this.village,
+    this.postalCode,
+    this.latitude,
+    this.longitude,
   });
 
   final String id;
@@ -199,6 +232,11 @@ class CustomerAddress {
   final String fullAddress;
   final String city;
   final bool isPrimary;
+  final String? district;
+  final String? village;
+  final String? postalCode;
+  final double? latitude;
+  final double? longitude;
 
   factory CustomerAddress.fromJson(Map<String, dynamic> json) {
     return CustomerAddress(
@@ -209,6 +247,11 @@ class CustomerAddress {
       fullAddress: json['full_address'] as String? ?? '',
       city: json['city'] as String? ?? 'Solo',
       isPrimary: json['is_primary'] as bool? ?? false,
+      district: json['district'] as String?,
+      village: json['village'] as String?,
+      postalCode: json['postal_code'] as String?,
+      latitude: (json['latitude'] as num?)?.toDouble(),
+      longitude: (json['longitude'] as num?)?.toDouble(),
     );
   }
 }
@@ -267,6 +310,32 @@ class OrderSummary {
       createdAt: DateTime.tryParse('${json['created_at']}'),
       address: address?['full_address'] as String?,
       city: address?['city'] as String?,
+    );
+  }
+}
+
+class PaymentCheckout {
+  const PaymentCheckout({
+    required this.paymentId,
+    required this.midtransOrderId,
+    required this.redirectUrl,
+    this.token,
+    this.reused = false,
+  });
+
+  final String paymentId;
+  final String midtransOrderId;
+  final String redirectUrl;
+  final String? token;
+  final bool reused;
+
+  factory PaymentCheckout.fromJson(Map<String, dynamic> json) {
+    return PaymentCheckout(
+      paymentId: json['payment_id'] as String? ?? '',
+      midtransOrderId: json['midtrans_order_id'] as String? ?? '',
+      redirectUrl: json['redirect_url'] as String? ?? '',
+      token: json['token'] as String?,
+      reused: json['reused'] as bool? ?? false,
     );
   }
 }

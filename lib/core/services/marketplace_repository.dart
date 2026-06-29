@@ -3,6 +3,7 @@ import 'dart:typed_data';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../models/mobile_models.dart';
+import 'location_service.dart';
 
 class MarketplaceRepository {
   MarketplaceRepository(this._client);
@@ -26,11 +27,15 @@ class MarketplaceRepository {
     }).toList();
   }
 
-  Future<List<TechnicianSummary>> technicians({String? query}) async {
+  Future<List<TechnicianSummary>> technicians({
+    String? query,
+    double? latitude,
+    double? longitude,
+  }) async {
     final data = await _client
         .from('technician_profiles')
         .select(
-          'id, user_id, service_area, skills, description, experience, verification_status, profile:profiles!user_id(full_name, email)',
+          'id, user_id, service_area, skills, description, experience, latitude, longitude, verification_status, profile:profiles!user_id(full_name, email)',
         )
         .eq('verification_status', 'verified')
         .order('created_at', ascending: false);
@@ -67,27 +72,51 @@ class MarketplaceRepository {
           status: item.status,
           description: item.description,
           experience: item.experience,
+          latitude: item.latitude,
+          longitude: item.longitude,
+          distanceKm:
+              latitude != null &&
+                  longitude != null &&
+                  item.latitude != null &&
+                  item.longitude != null
+              ? distanceKm(
+                  fromLatitude: latitude,
+                  fromLongitude: longitude,
+                  toLatitude: item.latitude!,
+                  toLongitude: item.longitude!,
+                )
+              : null,
           completedJobs: (orders as List).length,
           rating: rating,
         );
       }),
     );
     final normalized = query?.trim().toLowerCase();
-    if (normalized == null || normalized.isEmpty) return enriched;
-    return enriched
-        .where(
-          (item) =>
-              item.name.toLowerCase().contains(normalized) ||
-              item.skills.join(' ').toLowerCase().contains(normalized),
-        )
-        .toList();
+    final filtered = normalized == null || normalized.isEmpty
+        ? enriched
+        : enriched
+              .where(
+                (item) =>
+                    item.name.toLowerCase().contains(normalized) ||
+                    item.skills.join(' ').toLowerCase().contains(normalized),
+              )
+              .toList();
+    filtered.sort((a, b) {
+      final aDistance = a.distanceKm;
+      final bDistance = b.distanceKm;
+      if (aDistance == null && bDistance == null) return 0;
+      if (aDistance == null) return 1;
+      if (bDistance == null) return -1;
+      return aDistance.compareTo(bDistance);
+    });
+    return filtered;
   }
 
   Future<TechnicianSummary> technician(String id) async {
     final row = await _client
         .from('technician_profiles')
         .select(
-          'id, user_id, service_area, skills, description, experience, verification_status, profile:profiles!user_id(full_name, email)',
+          'id, user_id, service_area, skills, description, experience, latitude, longitude, verification_status, profile:profiles!user_id(full_name, email)',
         )
         .eq('id', id)
         .single();
@@ -119,7 +148,7 @@ class MarketplaceRepository {
     final data = await _client
         .from('customer_addresses')
         .select(
-          'id, label, recipient_name, phone, full_address, city, is_primary',
+          'id, label, recipient_name, phone, full_address, city, district, village, postal_code, latitude, longitude, is_primary',
         )
         .eq('customer_id', id)
         .order('is_primary', ascending: false);
@@ -133,6 +162,13 @@ class MarketplaceRepository {
     required String recipientName,
     required String phone,
     required String fullAddress,
+    String city = 'Solo',
+    String? district,
+    String? village,
+    String? postalCode,
+    double? latitude,
+    double? longitude,
+    bool isPrimary = true,
   }) async {
     final id = userId;
     if (id == null) throw StateError('User belum login');
@@ -144,11 +180,20 @@ class MarketplaceRepository {
           'recipient_name': recipientName,
           'phone': phone,
           'full_address': fullAddress,
-          'city': 'Solo',
-          'is_primary': true,
+          'city': city.trim().isEmpty ? 'Solo' : city.trim(),
+          'district': district?.trim().isEmpty ?? true
+              ? null
+              : district!.trim(),
+          'village': village?.trim().isEmpty ?? true ? null : village!.trim(),
+          'postal_code': postalCode?.trim().isEmpty ?? true
+              ? null
+              : postalCode!.trim(),
+          'latitude': latitude,
+          'longitude': longitude,
+          'is_primary': isPrimary,
         })
         .select(
-          'id, label, recipient_name, phone, full_address, city, is_primary',
+          'id, label, recipient_name, phone, full_address, city, district, village, postal_code, latitude, longitude, is_primary',
         )
         .single();
     return CustomerAddress.fromJson(row);
@@ -211,13 +256,32 @@ class MarketplaceRepository {
     ).map(OrderSummary.fromJson).toList();
   }
 
+  Future<PaymentCheckout> createMidtransPayment(String orderId) async {
+    final response = await _client.functions.invoke(
+      'midtrans-create-snap',
+      body: {'order_id': orderId},
+    );
+    if (response.status >= 400) {
+      final data = response.data;
+      if (data is Map && data['error'] != null) {
+        throw StateError('${data['error']}');
+      }
+      throw StateError('Gagal membuat pembayaran Midtrans');
+    }
+    final data = response.data;
+    if (data is! Map<String, dynamic>) {
+      throw StateError('Response pembayaran tidak valid');
+    }
+    return PaymentCheckout.fromJson(data);
+  }
+
   Future<TechnicianSummary?> myTechnicianProfile() async {
     final id = userId;
     if (id == null) return null;
     final row = await _client
         .from('technician_profiles')
         .select(
-          'id, user_id, service_area, skills, description, experience, verification_status, profile:profiles!user_id(full_name, email)',
+          'id, user_id, service_area, skills, description, experience, latitude, longitude, verification_status, profile:profiles!user_id(full_name, email)',
         )
         .eq('user_id', id)
         .maybeSingle();
@@ -230,6 +294,8 @@ class MarketplaceRepository {
     required String skills,
     required String serviceArea,
     required String description,
+    double? latitude,
+    double? longitude,
   }) async {
     final id = userId;
     if (id == null) throw StateError('User belum login');
@@ -244,6 +310,8 @@ class MarketplaceRepository {
           .toList(),
       'service_area': serviceArea.trim().isEmpty ? 'Solo' : serviceArea.trim(),
       'description': description,
+      'latitude': latitude,
+      'longitude': longitude,
     }, onConflict: 'user_id');
   }
 
