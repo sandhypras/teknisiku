@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
+import '../../../shared/widgets/app_feedback.dart';
 import '../admin_shell.dart';
 
 class AdminCustomersScreen extends StatefulWidget {
@@ -121,7 +122,7 @@ class _AdminCustomersScreenState extends State<AdminCustomersScreen> {
   void _showDetail(Map<String, dynamic> customer) {
     showDialog(
       context: context,
-      builder: (_) => AlertDialog(
+      builder: (_) => AppFeedbackDialog(
         title: Text(customer['full_name'] as String? ?? 'Detail Customer'),
         content: SizedBox(
           width: 620,
@@ -208,7 +209,7 @@ class _AdminCustomersScreenState extends State<AdminCustomersScreen> {
     showDialog(
       context: context,
       builder: (_) => StatefulBuilder(
-        builder: (context, setS) => AlertDialog(
+        builder: (context, setS) => AppFeedbackDialog(
           title: const Text('Edit Customer'),
           content: SizedBox(
             width: 420,
@@ -262,7 +263,7 @@ class _AdminCustomersScreenState extends State<AdminCustomersScreen> {
   void _confirmDelete(Map<String, dynamic> customer) {
     showDialog(
       context: context,
-      builder: (_) => AlertDialog(
+      builder: (_) => AppFeedbackDialog(
         title: const Text('Hapus Customer'),
         content: Text(
           'Hapus ${(customer['full_name'] as String?) ?? 'customer'} dari database?',

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
+import '../../../shared/widgets/app_feedback.dart';
 import '../admin_shell.dart';
 
 class AdminServicesScreen extends StatefulWidget {
@@ -155,7 +156,7 @@ class _AdminServicesScreenState extends State<AdminServicesScreen>
     final ctrl = TextEditingController();
     showDialog(
       context: context,
-      builder: (_) => AlertDialog(
+      builder: (_) => AppFeedbackDialog(
         title: const Text('Tolak Layanan'),
         content: TextField(
           controller: ctrl,
@@ -190,7 +191,7 @@ class _AdminServicesScreenState extends State<AdminServicesScreen>
             as Map<String, dynamic>?;
     showDialog(
       context: context,
-      builder: (_) => AlertDialog(
+      builder: (_) => AppFeedbackDialog(
         title: Text(data['name'] as String? ?? 'Detail Layanan'),
         content: SizedBox(
           width: 520,
@@ -246,7 +247,7 @@ class _AdminServicesScreenState extends State<AdminServicesScreen>
     showDialog(
       context: context,
       builder: (_) => StatefulBuilder(
-        builder: (context, setS) => AlertDialog(
+        builder: (context, setS) => AppFeedbackDialog(
           title: const Text('Edit Layanan'),
           content: SizedBox(
             width: 460,
@@ -324,7 +325,7 @@ class _AdminServicesScreenState extends State<AdminServicesScreen>
   void _confirmDeleteService(Map<String, dynamic> data) {
     showDialog(
       context: context,
-      builder: (_) => AlertDialog(
+      builder: (_) => AppFeedbackDialog(
         title: const Text('Hapus Layanan'),
         content: Text('Hapus layanan ${data['name'] ?? ''}?'),
         actions: [

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
+import '../../shared/widgets/app_feedback.dart';
 import 'admin_shell.dart';
 
 class AdminSettingsScreen extends StatefulWidget {
@@ -74,9 +75,11 @@ class _AdminSettingsScreenState extends State<AdminSettingsScreen> {
         },
       ]);
       if (mounted) {
-        ScaffoldMessenger.of(
+        AppFeedback.success(
           context,
-        ).showSnackBar(const SnackBar(content: Text('Pengaturan disimpan')));
+          title: 'Pengaturan disimpan',
+          message: 'Konfigurasi aplikasi berhasil diperbarui.',
+        );
         setState(() {
           _future = _fetch();
         });

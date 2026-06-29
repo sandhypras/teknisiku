@@ -2,8 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../app/app.dart';
-import '../../app/theme.dart';
 import '../../core/services/auth_service.dart';
+import '../../shared/widgets/app_feedback.dart';
 
 class LoginPage extends StatefulWidget {
   const LoginPage({super.key});
@@ -18,10 +18,12 @@ class _LoginPageState extends State<LoginPage> {
   final _formKey = GlobalKey<FormState>();
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
+  final _passwordFocusNode = FocusNode();
   late final AuthService _authService;
   bool _obscurePassword = true;
   bool _loading = false;
   String? _error;
+  int _errorSerial = 0;
   _LoginRole _selectedRole = _LoginRole.customer;
 
   @override
@@ -34,6 +36,7 @@ class _LoginPageState extends State<LoginPage> {
   void dispose() {
     _emailController.dispose();
     _passwordController.dispose();
+    _passwordFocusNode.dispose();
     super.dispose();
   }
 
@@ -50,10 +53,39 @@ class _LoginPageState extends State<LoginPage> {
       );
       if (mounted) Navigator.of(context).popUntil((route) => route.isFirst);
     } catch (error) {
-      setState(() => _error = error.toString());
+      setState(() {
+        _error = _loginErrorMessage(error);
+        _errorSerial += 1;
+      });
     } finally {
       if (mounted) setState(() => _loading = false);
     }
+  }
+
+  String _loginErrorMessage(Object error) {
+    if (error is AuthException) {
+      final message = error.message.toLowerCase();
+      if (message.contains('invalid login credentials') ||
+          message.contains('invalid credentials')) {
+        return 'Email atau password belum cocok. Periksa lagi password kamu, lalu coba masuk kembali.';
+      }
+      if (message.contains('email not confirmed')) {
+        return 'Email belum diverifikasi. Cek inbox kamu sebelum masuk.';
+      }
+    }
+    return 'Login belum berhasil. Pastikan email dan password sudah benar.';
+  }
+
+  void _retryPassword() {
+    setState(() {
+      _passwordController.clear();
+      _error = null;
+    });
+    _passwordFocusNode.requestFocus();
+  }
+
+  void _dismissError() {
+    setState(() => _error = null);
   }
 
   void _openRegister() {
@@ -139,6 +171,7 @@ class _LoginPageState extends State<LoginPage> {
                       const SizedBox(height: 16),
                       _AuthTextField(
                         controller: _passwordController,
+                        focusNode: _passwordFocusNode,
                         hint: 'Password',
                         icon: Icons.lock_outline_rounded,
                         obscureText: _obscurePassword,
@@ -163,6 +196,9 @@ class _LoginPageState extends State<LoginPage> {
                           return null;
                         },
                         onSubmitted: (_) => _submit(),
+                        onChanged: (_) {
+                          if (_error != null) setState(() => _error = null);
+                        },
                       ),
                     ],
                   ),
@@ -183,7 +219,15 @@ class _LoginPageState extends State<LoginPage> {
                 ),
                 if (_error != null) ...[
                   const SizedBox(height: 4),
-                  _ErrorBanner(message: _error!),
+                  AppFeedbackBanner(
+                    key: ValueKey(_errorSerial),
+                    type: AppFeedbackType.error,
+                    title: 'Password belum sesuai',
+                    message: _error!,
+                    actionLabel: 'Coba lagi',
+                    onAction: _retryPassword,
+                    onDismiss: _dismissError,
+                  ),
                   const SizedBox(height: 14),
                 ] else
                   const SizedBox(height: 14),
@@ -386,20 +430,24 @@ class _AuthTextField extends StatelessWidget {
     required this.hint,
     required this.icon,
     this.keyboardType,
+    this.focusNode,
     this.obscureText = false,
     this.suffix,
     this.validator,
     this.onSubmitted,
+    this.onChanged,
   });
 
   final TextEditingController controller;
   final String hint;
   final IconData icon;
   final TextInputType? keyboardType;
+  final FocusNode? focusNode;
   final bool obscureText;
   final Widget? suffix;
   final String? Function(String?)? validator;
   final ValueChanged<String>? onSubmitted;
+  final ValueChanged<String>? onChanged;
 
   @override
   Widget build(BuildContext context) {
@@ -407,10 +455,12 @@ class _AuthTextField extends StatelessWidget {
       decoration: _authCardDecoration(radius: 16),
       child: TextFormField(
         controller: controller,
+        focusNode: focusNode,
         keyboardType: keyboardType,
         obscureText: obscureText,
         validator: validator,
         onFieldSubmitted: onSubmitted,
+        onChanged: onChanged,
         style: const TextStyle(
           color: Color(0xFF07143D),
           fontSize: 17,
@@ -602,36 +652,6 @@ class _AdminNotice extends StatelessWidget {
           ),
         ),
       ],
-    );
-  }
-}
-
-class _ErrorBanner extends StatelessWidget {
-  const _ErrorBanner({required this.message});
-
-  final String message;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        color: AppColors.danger.withValues(alpha: 0.08),
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: AppColors.danger.withValues(alpha: 0.18)),
-      ),
-      child: Row(
-        children: [
-          const Icon(Icons.error_outline_rounded, color: AppColors.danger),
-          const SizedBox(width: 8),
-          Expanded(
-            child: Text(
-              message,
-              style: const TextStyle(color: AppColors.danger, fontSize: 12),
-            ),
-          ),
-        ],
-      ),
     );
   }
 }

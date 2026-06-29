@@ -62,10 +62,18 @@ class AuthService {
     if (id == null) return null;
     final row = await _client
         .from('profiles')
-        .select('id, email, full_name, phone, role, is_active')
+        .select(
+          'id, email, full_name, phone, role, is_active, profile_image_url',
+        )
         .eq('id', id)
         .maybeSingle();
-    return row == null ? null : mobile_models.AppProfile.fromJson(row);
+    if (row == null) return null;
+    return mobile_models.AppProfile.fromJson({
+      ...row,
+      'profile_image_url': _publicProfileImageUrl(
+        row['profile_image_url'] as String?,
+      ),
+    });
   }
 
   Future<admin_models.AppUserProfile?> getCurrentProfile() async {
@@ -80,4 +88,17 @@ class AuthService {
   }
 
   Future<void> signOut() => _client.auth.signOut();
+}
+
+String? _publicProfileImageUrl(String? path) {
+  if (path == null || path.trim().isEmpty) return null;
+  final value = path.trim();
+  if (value.startsWith('http')) return value;
+  final objectPath = value.startsWith('profile-images/')
+      ? value.substring('profile-images/'.length)
+      : value;
+  if (objectPath.isEmpty) return null;
+  return Supabase.instance.client.storage
+      .from('profile-images')
+      .getPublicUrl(objectPath);
 }

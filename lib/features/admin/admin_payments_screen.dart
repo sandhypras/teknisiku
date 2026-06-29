@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
+import '../../shared/widgets/app_feedback.dart';
 import 'admin_shell.dart';
 
 class AdminPaymentsScreen extends StatefulWidget {
@@ -155,7 +156,7 @@ class _AdminPaymentsScreenState extends State<AdminPaymentsScreen> {
             as Map<String, dynamic>?;
     showDialog(
       context: context,
-      builder: (_) => AlertDialog(
+      builder: (_) => AppFeedbackDialog(
         title: Text(order?['order_number'] as String? ?? 'Detail Pembayaran'),
         content: SizedBox(
           width: 520,
@@ -211,7 +212,7 @@ class _AdminPaymentsScreenState extends State<AdminPaymentsScreen> {
     showDialog(
       context: context,
       builder: (_) => StatefulBuilder(
-        builder: (context, setS) => AlertDialog(
+        builder: (context, setS) => AppFeedbackDialog(
           title: const Text('Edit Pembayaran'),
           content: SizedBox(
             width: 420,
@@ -284,7 +285,7 @@ class _AdminPaymentsScreenState extends State<AdminPaymentsScreen> {
     final path = proof.replaceFirst('payment-proofs/', '');
     showDialog(
       context: context,
-      builder: (_) => AlertDialog(
+      builder: (_) => AppFeedbackDialog(
         title: const Text('Bukti Pembayaran'),
         content: SizedBox(
           width: 520,
@@ -324,7 +325,7 @@ class _AdminPaymentsScreenState extends State<AdminPaymentsScreen> {
   void _confirmDeletePayment(Map<String, dynamic> data) {
     showDialog(
       context: context,
-      builder: (_) => AlertDialog(
+      builder: (_) => AppFeedbackDialog(
         title: const Text('Hapus Pembayaran'),
         content: const Text('Hapus data pembayaran ini?'),
         actions: [

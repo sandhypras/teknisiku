@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
+import '../../shared/widgets/app_feedback.dart';
 import 'admin_shell.dart';
 
 class AdminReviewsScreen extends StatefulWidget {
@@ -112,7 +113,7 @@ class _AdminReviewsScreenState extends State<AdminReviewsScreen> {
     final order = data['order'] as Map<String, dynamic>?;
     showDialog(
       context: context,
-      builder: (_) => AlertDialog(
+      builder: (_) => AppFeedbackDialog(
         title: const Text('Detail Ulasan'),
         content: SizedBox(
           width: 520,
@@ -147,7 +148,7 @@ class _AdminReviewsScreenState extends State<AdminReviewsScreen> {
     showDialog(
       context: context,
       builder: (_) => StatefulBuilder(
-        builder: (context, setS) => AlertDialog(
+        builder: (context, setS) => AppFeedbackDialog(
           title: const Text('Edit Ulasan'),
           content: SizedBox(
             width: 420,

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:image_picker/image_picker.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../app/theme.dart';
@@ -23,6 +24,8 @@ class _RegisterTechnicianPageState extends State<RegisterTechnicianPage> {
   final _description = TextEditingController();
   late final AuthService _auth;
   late final MarketplaceRepository _repo;
+  final _picker = ImagePicker();
+  XFile? _profilePhoto;
   bool _obscurePassword = true;
   bool _loading = false;
   String? _error;
@@ -47,19 +50,37 @@ class _RegisterTechnicianPageState extends State<RegisterTechnicianPage> {
     super.dispose();
   }
 
+  Future<void> _pickProfilePhoto() async {
+    final file = await _picker.pickImage(
+      source: ImageSource.gallery,
+      imageQuality: 82,
+      maxWidth: 1200,
+    );
+    if (file != null) setState(() => _profilePhoto = file);
+  }
+
   Future<void> _submit() async {
     if (!_formKey.currentState!.validate()) return;
+    if (_profilePhoto == null) {
+      setState(() => _error = 'Foto profil teknisi wajib diupload dari galeri');
+      return;
+    }
     setState(() {
       _loading = true;
       _error = null;
     });
     try {
-      await _auth.registerTechnician(
+      final response = await _auth.registerTechnician(
         email: _email.text.trim(),
         password: _password.text,
         fullName: _name.text.trim(),
         phone: _phone.text.trim(),
       );
+      final userId =
+          response.user?.id ?? Supabase.instance.client.auth.currentUser?.id;
+      if (userId == null) throw StateError('User teknisi gagal dibuat');
+      final imagePath = await _uploadProfilePhoto(userId, _profilePhoto!);
+      await _saveProfileImage(userId, imagePath);
       await _repo.upsertTechnicianProfile(
         address: '-',
         experience: _experience.text.trim(),
@@ -73,6 +94,37 @@ class _RegisterTechnicianPageState extends State<RegisterTechnicianPage> {
     } finally {
       if (mounted) setState(() => _loading = false);
     }
+  }
+
+  Future<String> _uploadProfilePhoto(String userId, XFile file) async {
+    final extension = _extensionFor(file.name, file.mimeType);
+    final path =
+        '$userId/technician-profile-${DateTime.now().millisecondsSinceEpoch}$extension';
+    await Supabase.instance.client.storage
+        .from('profile-images')
+        .uploadBinary(
+          path,
+          await file.readAsBytes(),
+          fileOptions: FileOptions(
+            contentType: file.mimeType ?? _contentTypeFor(extension),
+            upsert: true,
+          ),
+        );
+    return 'profile-images/$path';
+  }
+
+  Future<void> _saveProfileImage(String userId, String imagePath) async {
+    for (var attempt = 0; attempt < 3; attempt += 1) {
+      final updated = await Supabase.instance.client
+          .from('profiles')
+          .update({'profile_image_url': imagePath})
+          .eq('id', userId)
+          .select('id')
+          .maybeSingle();
+      if (updated != null) return;
+      await Future<void>.delayed(const Duration(milliseconds: 350));
+    }
+    throw StateError('Profil teknisi belum siap untuk menyimpan foto');
   }
 
   @override
@@ -157,6 +209,10 @@ class _RegisterTechnicianPageState extends State<RegisterTechnicianPage> {
                   key: _formKey,
                   child: Column(
                     children: [
+                      _TechProfilePhotoPicker(
+                        file: _profilePhoto,
+                        onPick: _pickProfilePhoto,
+                      ),
                       _TechRegisterField(
                         controller: _name,
                         hint: 'Nama lengkap',
@@ -337,6 +393,76 @@ class _TechRegisterField extends StatelessWidget {
   }
 }
 
+class _TechProfilePhotoPicker extends StatelessWidget {
+  const _TechProfilePhotoPicker({required this.file, required this.onPick});
+
+  final XFile? file;
+  final VoidCallback onPick;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 16),
+      child: Container(
+        width: double.infinity,
+        padding: const EdgeInsets.all(14),
+        decoration: _techRegisterCardDecoration(radius: 18),
+        child: Row(
+          children: [
+            Container(
+              width: 66,
+              height: 66,
+              decoration: BoxDecoration(
+                color: const Color(0xFFEAF4FF),
+                borderRadius: BorderRadius.circular(20),
+              ),
+              child: Icon(
+                file == null
+                    ? Icons.add_a_photo_rounded
+                    : Icons.check_circle_rounded,
+                color: const Color(0xFF0876ED),
+                size: 31,
+              ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text(
+                    'Foto profil teknisi wajib',
+                    style: TextStyle(
+                      color: Color(0xFF07143D),
+                      fontSize: 15,
+                      fontWeight: FontWeight.w900,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    file == null ? 'Pilih foto wajah dari galeri' : file!.name,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                      color: Color(0xFF59657C),
+                      fontSize: 12,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            TextButton.icon(
+              onPressed: onPick,
+              icon: const Icon(Icons.photo_library_rounded, size: 18),
+              label: Text(file == null ? 'Pilih' : 'Ganti'),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
 class _TechRegisterBackdrop extends StatelessWidget {
   const _TechRegisterBackdrop();
 
@@ -420,6 +546,26 @@ String? _passwordValidator(String? value) {
   if (password.isEmpty) return 'Password wajib diisi';
   if (password.length < 6) return 'Password minimal 6 karakter';
   return null;
+}
+
+String _extensionFor(String fileName, String? mimeType) {
+  final lowerName = fileName.toLowerCase();
+  for (final extension in ['.jpg', '.jpeg', '.png', '.webp']) {
+    if (lowerName.endsWith(extension)) return extension;
+  }
+  return switch (mimeType) {
+    'image/png' => '.png',
+    'image/webp' => '.webp',
+    _ => '.jpg',
+  };
+}
+
+String _contentTypeFor(String extension) {
+  return switch (extension.toLowerCase()) {
+    '.png' => 'image/png',
+    '.webp' => 'image/webp',
+    _ => 'image/jpeg',
+  };
 }
 
 BoxDecoration _techRegisterCardDecoration({required double radius}) {

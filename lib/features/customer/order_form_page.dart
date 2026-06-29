@@ -6,6 +6,7 @@ import '../../core/models/mobile_models.dart';
 import '../../core/services/location_service.dart';
 import '../../core/services/marketplace_repository.dart';
 import '../../shared/mobile_ui.dart';
+import '../../shared/widgets/app_feedback.dart';
 
 class OrderFormPage extends StatefulWidget {
   const OrderFormPage({
@@ -81,15 +82,19 @@ class _OrderFormPageState extends State<OrderFormPage> {
         problemDescription: _problem.text.trim(),
       );
       if (!mounted) return;
-      ScaffoldMessenger.of(
+      AppFeedback.success(
         context,
-      ).showSnackBar(const SnackBar(content: Text('Pesanan berhasil dibuat')));
+        title: 'Pesanan dibuat',
+        message: 'Pesanan berhasil dikirim ke teknisi.',
+      );
       Navigator.of(context).popUntil((route) => route.isFirst);
     } catch (error) {
       if (!mounted) return;
-      ScaffoldMessenger.of(
+      AppFeedback.error(
         context,
-      ).showSnackBar(SnackBar(content: Text(error.toString())));
+        title: 'Pesanan gagal dibuat',
+        message: error.toString(),
+      );
     } finally {
       if (mounted) setState(() => _loading = false);
     }
@@ -138,9 +143,11 @@ class _OrderFormPageState extends State<OrderFormPage> {
       });
     } catch (error) {
       if (!mounted) return;
-      ScaffoldMessenger.of(
+      AppFeedback.warning(
         context,
-      ).showSnackBar(SnackBar(content: Text(error.toString())));
+        title: 'Lokasi belum terbaca',
+        message: error.toString(),
+      );
     } finally {
       if (mounted) setState(() => _locating = false);
     }

@@ -7,6 +7,7 @@ import '../../core/services/auth_service.dart';
 import '../../core/services/location_service.dart';
 import '../../core/services/marketplace_repository.dart';
 import '../../shared/mobile_ui.dart';
+import '../../shared/widgets/app_feedback.dart';
 
 class TechnicianProfilePage extends StatefulWidget {
   const TechnicianProfilePage({
@@ -68,17 +69,19 @@ class _TechnicianProfilePageState extends State<TechnicianProfilePage> {
         contentType: file.mimeType,
       );
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('${_documentTitle(documentType)} berhasil diupload'),
-        ),
+      AppFeedback.success(
+        context,
+        title: 'Dokumen terupload',
+        message: '${_documentTitle(documentType)} berhasil diupload.',
       );
       _refresh();
     } catch (error) {
       if (!mounted) return;
-      ScaffoldMessenger.of(
+      AppFeedback.error(
         context,
-      ).showSnackBar(SnackBar(content: Text('Upload gagal: $error')));
+        title: 'Upload gagal',
+        message: error.toString(),
+      );
     } finally {
       if (mounted) setState(() => _uploadingType = null);
     }
@@ -86,10 +89,10 @@ class _TechnicianProfilePageState extends State<TechnicianProfilePage> {
 
   void _showUploadOptions(TechnicianSummary? technician, String documentType) {
     if (technician == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Lengkapi profil teknisi dulu sebelum upload dokumen.'),
-        ),
+      AppFeedback.warning(
+        context,
+        title: 'Profil belum lengkap',
+        message: 'Lengkapi profil teknisi dulu sebelum upload dokumen.',
       );
       return;
     }
@@ -527,8 +530,10 @@ class _TechnicianProfilePageState extends State<TechnicianProfilePage> {
                             setSheetState(() {});
                           } catch (error) {
                             if (!context.mounted) return;
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              SnackBar(content: Text(error.toString())),
+                            AppFeedback.warning(
+                              context,
+                              title: 'Lokasi belum terbaca',
+                              message: error.toString(),
                             );
                           } finally {
                             setSheetState(() => locating = false);
@@ -919,14 +924,23 @@ class _TechnicianIdentityCard extends StatelessWidget {
                     child: CircleAvatar(
                       radius: 50,
                       backgroundColor: const Color(0xFFEAF4FF),
-                      child: Text(
-                        _initials(profile.fullName),
-                        style: const TextStyle(
-                          color: AppColors.primary,
-                          fontSize: 30,
-                          fontWeight: FontWeight.w900,
-                        ),
-                      ),
+                      backgroundImage:
+                          profile.profileImageUrl == null ||
+                              profile.profileImageUrl!.isEmpty
+                          ? null
+                          : NetworkImage(profile.profileImageUrl!),
+                      child:
+                          profile.profileImageUrl == null ||
+                              profile.profileImageUrl!.isEmpty
+                          ? Text(
+                              _initials(profile.fullName),
+                              style: const TextStyle(
+                                color: AppColors.primary,
+                                fontSize: 30,
+                                fontWeight: FontWeight.w900,
+                              ),
+                            )
+                          : null,
                     ),
                   ),
                   Positioned(

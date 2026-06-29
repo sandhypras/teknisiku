@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
+import '../../../shared/widgets/app_feedback.dart';
 import '../admin_shell.dart';
 
 class AdminOrdersScreen extends StatefulWidget {
@@ -133,7 +134,7 @@ class _AdminOrdersScreenState extends State<AdminOrdersScreen> {
             as Map<String, dynamic>?;
     showDialog(
       context: context,
-      builder: (_) => AlertDialog(
+      builder: (_) => AppFeedbackDialog(
         title: Text(data['order_number'] as String? ?? 'Detail Order'),
         content: SizedBox(
           width: 580,
@@ -191,7 +192,7 @@ class _AdminOrdersScreenState extends State<AdminOrdersScreen> {
     showDialog(
       context: context,
       builder: (_) => StatefulBuilder(
-        builder: (context, setS) => AlertDialog(
+        builder: (context, setS) => AppFeedbackDialog(
           title: Text('Edit ${data['order_number'] ?? 'Order'}'),
           content: SizedBox(
             width: 440,
@@ -252,7 +253,7 @@ class _AdminOrdersScreenState extends State<AdminOrdersScreen> {
   void _confirmDeleteOrder(Map<String, dynamic> data) {
     showDialog(
       context: context,
-      builder: (_) => AlertDialog(
+      builder: (_) => AppFeedbackDialog(
         title: const Text('Hapus Order'),
         content: Text('Hapus order ${data['order_number'] ?? ''}?'),
         actions: [

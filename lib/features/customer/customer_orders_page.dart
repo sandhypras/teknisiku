@@ -7,6 +7,7 @@ import '../../app/theme.dart';
 import '../../core/models/mobile_models.dart';
 import '../../core/services/marketplace_repository.dart';
 import '../../shared/mobile_ui.dart';
+import '../../shared/widgets/app_feedback.dart';
 
 class CustomerOrdersPage extends StatefulWidget {
   const CustomerOrdersPage({required this.repo, super.key});
@@ -40,17 +41,19 @@ class _CustomerOrdersPageState extends State<CustomerOrdersPage> {
       final opened = await launchUrl(url, mode: LaunchMode.externalApplication);
       if (!opened) throw StateError('Tidak dapat membuka halaman Midtrans');
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Halaman pembayaran Midtrans Sandbox dibuka'),
-        ),
+      AppFeedback.info(
+        context,
+        title: 'Pembayaran dibuka',
+        message: 'Halaman pembayaran Midtrans Sandbox sudah dibuka.',
       );
       _refresh();
     } catch (error) {
       if (!mounted) return;
-      ScaffoldMessenger.of(
+      AppFeedback.error(
         context,
-      ).showSnackBar(SnackBar(content: Text(error.toString())));
+        title: 'Pembayaran gagal',
+        message: error.toString(),
+      );
     } finally {
       if (mounted) setState(() => _payingOrderId = null);
     }
@@ -172,10 +175,9 @@ class _OrdersLoadingState extends StatelessWidget {
 }
 
 class _ShimmerBlock extends StatefulWidget {
-  const _ShimmerBlock({required this.height, this.width, this.radius = 16});
+  const _ShimmerBlock({required this.height, this.radius = 16});
 
   final double height;
-  final double? width;
   final double radius;
 
   @override
@@ -203,7 +205,7 @@ class _ShimmerBlockState extends State<_ShimmerBlock>
         final t = _controller.value;
         return Container(
           height: widget.height,
-          width: widget.width,
+          width: double.infinity,
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(widget.radius),
             gradient: LinearGradient(
@@ -1358,4 +1360,3 @@ String _shortTime(String value) {
   if (value.length >= 5) return value.substring(0, 5);
   return value;
 }
-

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
+import '../../../shared/widgets/app_feedback.dart';
 import '../admin_shell.dart';
 
 class AdminTechniciansScreen extends StatefulWidget {
@@ -164,7 +165,7 @@ class _AdminTechniciansScreenState extends State<AdminTechniciansScreen>
     final ctrl = TextEditingController();
     showDialog(
       context: context,
-      builder: (_) => AlertDialog(
+      builder: (_) => AppFeedbackDialog(
         title: const Text('Tolak Teknisi'),
         content: TextField(
           controller: ctrl,
@@ -201,7 +202,7 @@ class _AdminTechniciansScreenState extends State<AdminTechniciansScreen>
     };
     showDialog(
       context: context,
-      builder: (_) => AlertDialog(
+      builder: (_) => AppFeedbackDialog(
         title: Text(title),
         content: SizedBox(
           width: 520,
@@ -253,7 +254,7 @@ class _AdminTechniciansScreenState extends State<AdminTechniciansScreen>
     );
     showDialog(
       context: context,
-      builder: (_) => AlertDialog(
+      builder: (_) => AppFeedbackDialog(
         title: Text(profile?['full_name'] as String? ?? 'Detail Teknisi'),
         content: SizedBox(
           width: 560,
@@ -314,7 +315,7 @@ class _AdminTechniciansScreenState extends State<AdminTechniciansScreen>
     showDialog(
       context: context,
       builder: (_) => StatefulBuilder(
-        builder: (context, setS) => AlertDialog(
+        builder: (context, setS) => AppFeedbackDialog(
           title: const Text('Edit Teknisi'),
           content: SizedBox(
             width: 440,
@@ -384,7 +385,7 @@ class _AdminTechniciansScreenState extends State<AdminTechniciansScreen>
     final profile = data['profile'] as Map<String, dynamic>?;
     showDialog(
       context: context,
-      builder: (_) => AlertDialog(
+      builder: (_) => AppFeedbackDialog(
         title: const Text('Hapus Teknisi'),
         content: Text('Hapus profil teknisi ${profile?['full_name'] ?? ''}?'),
         actions: [

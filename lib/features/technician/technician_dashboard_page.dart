@@ -326,14 +326,23 @@ class _GreetingCard extends StatelessWidget {
                     child: CircleAvatar(
                       radius: 38,
                       backgroundColor: Colors.white,
-                      child: Text(
-                        _initials(profile.fullName),
-                        style: const TextStyle(
-                          color: AppColors.primary,
-                          fontSize: 26,
-                          fontWeight: FontWeight.w900,
-                        ),
-                      ),
+                      backgroundImage:
+                          profile.profileImageUrl == null ||
+                              profile.profileImageUrl!.isEmpty
+                          ? null
+                          : NetworkImage(profile.profileImageUrl!),
+                      child:
+                          profile.profileImageUrl == null ||
+                              profile.profileImageUrl!.isEmpty
+                          ? Text(
+                              _initials(profile.fullName),
+                              style: const TextStyle(
+                                color: AppColors.primary,
+                                fontSize: 26,
+                                fontWeight: FontWeight.w900,
+                              ),
+                            )
+                          : null,
                     ),
                   ),
                   Positioned(

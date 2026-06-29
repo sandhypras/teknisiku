@@ -35,13 +35,14 @@ class MarketplaceRepository {
     final data = await _client
         .from('technician_profiles')
         .select(
-          'id, user_id, service_area, skills, description, experience, latitude, longitude, verification_status, profile:profiles!user_id(full_name, email)',
+          'id, user_id, service_area, skills, description, experience, latitude, longitude, verification_status, profile:profiles!user_id(full_name, email, profile_image_url)',
         )
         .eq('verification_status', 'verified')
         .order('created_at', ascending: false);
-    final technicians = List<Map<String, dynamic>>.from(
-      data,
-    ).map(TechnicianSummary.fromJson).toList();
+    final technicians = List<Map<String, dynamic>>.from(data)
+        .map(_normalizeTechnicianProfileImage)
+        .map(TechnicianSummary.fromJson)
+        .toList();
     final enriched = await Future.wait(
       technicians.map((item) async {
         final reviews = await _client
@@ -72,6 +73,7 @@ class MarketplaceRepository {
           status: item.status,
           description: item.description,
           experience: item.experience,
+          profileImageUrl: item.profileImageUrl,
           latitude: item.latitude,
           longitude: item.longitude,
           distanceKm:
@@ -116,11 +118,11 @@ class MarketplaceRepository {
     final row = await _client
         .from('technician_profiles')
         .select(
-          'id, user_id, service_area, skills, description, experience, latitude, longitude, verification_status, profile:profiles!user_id(full_name, email)',
+          'id, user_id, service_area, skills, description, experience, latitude, longitude, verification_status, profile:profiles!user_id(full_name, email, profile_image_url)',
         )
         .eq('id', id)
         .single();
-    return TechnicianSummary.fromJson(row);
+    return TechnicianSummary.fromJson(_normalizeTechnicianProfileImage(row));
   }
 
   Future<List<TechnicianService>> services({
@@ -281,11 +283,13 @@ class MarketplaceRepository {
     final row = await _client
         .from('technician_profiles')
         .select(
-          'id, user_id, service_area, skills, description, experience, latitude, longitude, verification_status, profile:profiles!user_id(full_name, email)',
+          'id, user_id, service_area, skills, description, experience, latitude, longitude, verification_status, profile:profiles!user_id(full_name, email, profile_image_url)',
         )
         .eq('user_id', id)
         .maybeSingle();
-    return row == null ? null : TechnicianSummary.fromJson(row);
+    return row == null
+        ? null
+        : TechnicianSummary.fromJson(_normalizeTechnicianProfileImage(row));
   }
 
   Future<void> upsertTechnicianProfile({
@@ -439,6 +443,22 @@ String? _publicCategoryIconUrl(String? path) {
   if (objectPath.isEmpty) return null;
 
   return Supabase.instance.client.storage.from(bucket).getPublicUrl(objectPath);
+}
+
+Map<String, dynamic> _normalizeTechnicianProfileImage(
+  Map<String, dynamic> json,
+) {
+  final profile = json['profile'];
+  if (profile is! Map<String, dynamic>) return json;
+  return {
+    ...json,
+    'profile': {
+      ...profile,
+      'profile_image_url': _publicCategoryIconUrl(
+        profile['profile_image_url'] as String?,
+      ),
+    },
+  };
 }
 
 String _fileExtension(String fileName, String? contentType) {

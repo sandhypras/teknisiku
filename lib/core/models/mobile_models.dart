@@ -24,6 +24,7 @@ class AppProfile {
     required this.role,
     required this.isActive,
     this.phone,
+    this.profileImageUrl,
   });
 
   final String id;
@@ -32,6 +33,7 @@ class AppProfile {
   final AppRole role;
   final bool isActive;
   final String? phone;
+  final String? profileImageUrl;
 
   factory AppProfile.fromJson(Map<String, dynamic> json) {
     return AppProfile(
@@ -39,6 +41,7 @@ class AppProfile {
       email: json['email'] as String? ?? '',
       fullName: json['full_name'] as String? ?? '',
       phone: json['phone'] as String?,
+      profileImageUrl: json['profile_image_url'] as String?,
       role: AppRole.fromValue(json['role'] as String?),
       isActive: json['is_active'] as bool? ?? true,
     );
@@ -84,6 +87,7 @@ class TechnicianSummary {
     this.latitude,
     this.longitude,
     this.distanceKm,
+    this.profileImageUrl,
   });
 
   final String id;
@@ -100,6 +104,7 @@ class TechnicianSummary {
   final double? latitude;
   final double? longitude;
   final double? distanceKm;
+  final String? profileImageUrl;
 
   factory TechnicianSummary.fromJson(Map<String, dynamic> json) {
     final profile = json['profile'] as Map<String, dynamic>? ?? {};
@@ -108,6 +113,9 @@ class TechnicianSummary {
       userId: json['user_id'] as String? ?? '',
       name: profile['full_name'] as String? ?? 'Teknisi',
       email: profile['email'] as String? ?? '',
+      profileImageUrl: _publicProfileImageUrl(
+        profile['profile_image_url'] as String?,
+      ),
       serviceArea: json['service_area'] as String? ?? 'Solo',
       skills: (json['skills'] as List?)?.map((item) => '$item').toList() ?? [],
       status: json['verification_status'] as String? ?? 'pending',
@@ -137,8 +145,17 @@ class TechnicianSummary {
       latitude: latitude,
       longitude: longitude,
       distanceKm: distanceKm ?? this.distanceKm,
+      profileImageUrl: profileImageUrl,
     );
   }
+}
+
+String? _publicProfileImageUrl(String? path) {
+  if (path == null || path.trim().isEmpty) return null;
+  final value = path.trim();
+  if (value.startsWith('http')) return value;
+  if (value.startsWith('profile-images/')) return value;
+  return 'profile-images/$value';
 }
 
 class TechnicianService {
