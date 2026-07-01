@@ -7,6 +7,7 @@ import 'admin_payments_screen.dart';
 import 'admin_reports_screen.dart';
 import 'admin_reviews_screen.dart';
 import 'admin_settings_screen.dart';
+import 'admin_withdrawals_screen.dart';
 import 'categories/admin_categories_screen.dart';
 import 'customers/admin_customers_screen.dart';
 import 'dashboard/admin_dashboard_screen.dart';
@@ -97,8 +98,13 @@ class _AdminShellState extends State<AdminShell> {
     _NavItem(icon: Icons.payment_outlined, label: 'Pembayaran', index: 7),
     _NavItem(icon: Icons.star_outline_rounded, label: 'Ulasan', index: 8),
     _NavItem(icon: Icons.percent_outlined, label: 'Komisi', index: 9),
-    _NavItem(icon: Icons.bar_chart_outlined, label: 'Laporan', index: 10),
-    _NavItem(icon: Icons.settings_outlined, label: 'Pengaturan', index: 11),
+    _NavItem(
+      icon: Icons.account_balance_wallet_outlined,
+      label: 'Penarikan',
+      index: 10,
+    ),
+    _NavItem(icon: Icons.bar_chart_outlined, label: 'Laporan', index: 11),
+    _NavItem(icon: Icons.settings_outlined, label: 'Pengaturan', index: 12),
   ];
 
   List<Widget> get _screens => [
@@ -112,6 +118,7 @@ class _AdminShellState extends State<AdminShell> {
     const AdminPaymentsScreen(),
     const AdminReviewsScreen(),
     const AdminCommissionScreen(),
+    const AdminWithdrawalsScreen(),
     const AdminReportsScreen(),
     const AdminSettingsScreen(),
   ];

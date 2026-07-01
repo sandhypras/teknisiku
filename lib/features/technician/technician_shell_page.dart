@@ -9,6 +9,7 @@ import 'technician_dashboard_page.dart';
 import 'technician_orders_page.dart';
 import 'technician_profile_page.dart';
 import 'technician_services_page.dart';
+import 'technician_withdrawal_page.dart';
 
 class TechnicianShellPage extends StatefulWidget {
   const TechnicianShellPage({
@@ -34,6 +35,7 @@ class _TechnicianShellPageState extends State<TechnicianShellPage> {
       TechnicianDashboardPage(profile: widget.profile, repo: repo),
       TechnicianOrdersPage(repo: repo),
       TechnicianServicesPage(repo: repo),
+      TechnicianWithdrawalPage(repo: repo),
       TechnicianProfilePage(
         profile: widget.profile,
         repo: repo,
@@ -58,9 +60,14 @@ class _TechnicianShellPageState extends State<TechnicianShellPage> {
             label: 'Order Saya',
           ),
           NavigationDestination(
-            icon: Icon(Icons.chat_bubble_outline_rounded),
-            selectedIcon: Icon(Icons.chat_bubble_rounded),
-            label: 'Pesan',
+            icon: Icon(Icons.grid_view_outlined),
+            selectedIcon: Icon(Icons.grid_view_rounded),
+            label: 'Layanan',
+          ),
+          NavigationDestination(
+            icon: Icon(Icons.account_balance_wallet_outlined),
+            selectedIcon: Icon(Icons.account_balance_wallet_rounded),
+            label: 'Saldo',
           ),
           NavigationDestination(
             icon: Icon(Icons.person_outline_rounded),

@@ -5,6 +5,8 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import '../models/mobile_models.dart';
 import 'location_service.dart';
 
+const double kServiceFee = 6000;
+
 class MarketplaceRepository {
   MarketplaceRepository(this._client);
 
@@ -132,16 +134,19 @@ class MarketplaceRepository {
     var q = _client
         .from('services')
         .select(
-          'id, technician_id, category_id, name, description, estimated_price, estimated_duration, approval_status, is_active, category:categories(name)',
+          'id, technician_id, category_id, name, description, estimated_price, estimated_duration, image_url, approval_status, is_active, category:categories(name)',
         );
     if (technicianId != null) q = q.eq('technician_id', technicianId);
     if (publicOnly) {
       q = q.eq('approval_status', 'approved').eq('is_active', true);
     }
     final data = await q.order('created_at', ascending: false);
-    return List<Map<String, dynamic>>.from(
-      data,
-    ).map(TechnicianService.fromJson).toList();
+    return List<Map<String, dynamic>>.from(data).map((json) {
+      return TechnicianService.fromJson({
+        ...json,
+        'image_url': _publicServiceImageUrl(json['image_url'] as String?),
+      });
+    }).toList();
   }
 
   Future<List<CustomerAddress>> customerAddresses() async {
@@ -211,7 +216,8 @@ class MarketplaceRepository {
   }) async {
     final id = userId;
     if (id == null) throw StateError('User belum login');
-    final total = services.fold<double>(0, (sum, item) => sum + item.price);
+    final subtotal = services.fold<double>(0, (sum, item) => sum + item.price);
+    final total = subtotal + kServiceFee;
     final order = await _client
         .from('orders')
         .insert({
@@ -224,6 +230,7 @@ class MarketplaceRepository {
           'problem_description': problemDescription,
           'estimated_total': total,
           'final_total': 0,
+          'service_fee': kServiceFee,
         })
         .select('id')
         .single();
@@ -249,13 +256,156 @@ class MarketplaceRepository {
     final data = await _client
         .from('orders')
         .select(
-          'id, order_number, status, problem_description, schedule_date, schedule_time, estimated_total, final_total, created_at, customer:profiles!customer_id(full_name, phone), address:customer_addresses!address_id(full_address, city), technician:technician_profiles!technician_id(profile:profiles!user_id(full_name))',
+          'id, order_number, technician_id, status, problem_description, schedule_date, schedule_time, estimated_total, final_total, service_fee, created_at, customer:profiles!customer_id(full_name, phone), address:customer_addresses!address_id(full_address, city), technician:technician_profiles!technician_id(profile:profiles!user_id(full_name))',
         )
         .eq('customer_id', id)
         .order('created_at', ascending: false);
     return List<Map<String, dynamic>>.from(
       data,
     ).map(OrderSummary.fromJson).toList();
+  }
+
+  Future<List<AppNotification>> notifications() async {
+    final id = userId;
+    if (id == null) return [];
+    final data = await _client
+        .from('notifications')
+        .select('id, type, title, message, is_read, created_at')
+        .eq('user_id', id)
+        .order('created_at', ascending: false)
+        .limit(50);
+    return List<Map<String, dynamic>>.from(
+      data,
+    ).map(AppNotification.fromJson).toList();
+  }
+
+  Future<int> unreadNotificationCount() async {
+    final id = userId;
+    if (id == null) return 0;
+    final data = await _client
+        .from('notifications')
+        .select('id')
+        .eq('user_id', id)
+        .eq('is_read', false);
+    return (data as List).length;
+  }
+
+  Future<void> markNotificationRead(String notificationId) async {
+    await _client
+        .from('notifications')
+        .update({'is_read': true})
+        .eq('id', notificationId);
+  }
+
+  Future<void> markAllNotificationsRead() async {
+    final id = userId;
+    if (id == null) return;
+    await _client
+        .from('notifications')
+        .update({'is_read': true})
+        .eq('user_id', id)
+        .eq('is_read', false);
+  }
+
+  Future<InvoiceSummary?> orderInvoice(String orderId) async {
+    final row = await _client
+        .from('invoices')
+        .select(
+          'id, order_id, invoice_number, payment_id, invoice_date, total_amount',
+        )
+        .eq('order_id', orderId)
+        .maybeSingle();
+    return row == null ? null : InvoiceSummary.fromJson(row);
+  }
+
+  Future<WarrantySummary?> orderWarranty(String orderId) async {
+    final row = await _client
+        .from('warranties')
+        .select('id, order_id, warranty_number, start_date, end_date, status')
+        .eq('order_id', orderId)
+        .maybeSingle();
+    return row == null ? null : WarrantySummary.fromJson(row);
+  }
+
+  Future<OrderWorkflowDetail> orderWorkflowDetail(String orderId) async {
+    final results = await Future.wait<Object?>([
+      _client
+          .from('diagnoses')
+          .select(
+            'id, order_id, diagnosis_result, work_estimation, service_cost, sparepart_cost, total_cost, created_at',
+          )
+          .eq('order_id', orderId)
+          .maybeSingle(),
+      _client
+          .from('order_spareparts')
+          .select('id, sparepart_name, quantity, unit_price')
+          .eq('order_id', orderId)
+          .order('created_at'),
+      _client
+          .from('order_attachments')
+          .select('id, file_url, caption, created_at')
+          .eq('order_id', orderId)
+          .order('created_at', ascending: false),
+      orderInvoice(orderId),
+      orderWarranty(orderId),
+    ]);
+    final diagnosisRow = results[0] as Map<String, dynamic>?;
+    final sparepartRows = List<Map<String, dynamic>>.from(results[1] as List);
+    final attachmentRows = List<Map<String, dynamic>>.from(results[2] as List);
+    return OrderWorkflowDetail(
+      diagnosis: diagnosisRow == null
+          ? null
+          : OrderDiagnosis.fromJson(diagnosisRow),
+      spareparts: sparepartRows.map(OrderSparepart.fromJson).toList(),
+      attachments: await Future.wait(
+        attachmentRows.map((json) async {
+          return OrderAttachment.fromJson({
+            ...json,
+            'file_url': await signedOrderAttachmentUrl(
+              json['file_url'] as String? ?? '',
+            ),
+          });
+        }),
+      ),
+      invoice: results[3] as InvoiceSummary?,
+      warranty: results[4] as WarrantySummary?,
+    );
+  }
+
+  Future<void> submitOrderDiagnosis({
+    required String orderId,
+    required String diagnosisResult,
+    required String workEstimation,
+    required double serviceCost,
+    required List<Map<String, dynamic>> spareparts,
+  }) async {
+    await _client.rpc(
+      'submit_order_diagnosis',
+      params: {
+        'p_order_id': orderId,
+        'p_diagnosis_result': diagnosisResult,
+        'p_work_estimation': workEstimation,
+        'p_service_cost': serviceCost,
+        'p_spareparts': spareparts,
+      },
+    );
+  }
+
+  Future<void> decideOrderPrice({
+    required String orderId,
+    required bool approved,
+  }) async {
+    await _client.rpc(
+      'customer_decide_order_price',
+      params: {'p_order_id': orderId, 'p_approved': approved},
+    );
+  }
+
+  Future<void> completeOrderWithDocuments(String orderId) async {
+    await _client.rpc(
+      'complete_order_with_documents',
+      params: {'p_order_id': orderId},
+    );
   }
 
   Future<PaymentCheckout> createMidtransPayment(String orderId) async {
@@ -389,6 +539,7 @@ class MarketplaceRepository {
     required String description,
     required double price,
     required String duration,
+    String? imageUrl,
   }) async {
     await _client.from('services').insert({
       'technician_id': technicianId,
@@ -397,16 +548,67 @@ class MarketplaceRepository {
       'description': description,
       'estimated_price': price,
       'estimated_duration': duration,
+      if (imageUrl != null && imageUrl.trim().isNotEmpty)
+        'image_url': imageUrl.trim(),
       'approval_status': 'pending',
       'is_active': true,
     });
+  }
+
+  Future<void> updateTechnicianService({
+    required String serviceId,
+    required String categoryId,
+    required String name,
+    required String description,
+    required double price,
+    required String duration,
+    String? imageUrl,
+  }) async {
+    await _client
+        .from('services')
+        .update({
+          'category_id': categoryId,
+          'name': name,
+          'description': description,
+          'estimated_price': price,
+          'estimated_duration': duration,
+          if (imageUrl != null && imageUrl.trim().isNotEmpty)
+            'image_url': imageUrl.trim(),
+          'approval_status': 'pending',
+          'is_active': true,
+        })
+        .eq('id', serviceId);
+  }
+
+  Future<String> uploadServiceImage({
+    required String technicianId,
+    required Uint8List bytes,
+    required String fileName,
+    String? contentType,
+  }) async {
+    final id = userId;
+    if (id == null) throw StateError('User belum login');
+    final extension = _fileExtension(fileName, contentType);
+    final path =
+        '$id/$technicianId/service-${DateTime.now().millisecondsSinceEpoch}$extension';
+    await _client.storage
+        .from('service-images')
+        .uploadBinary(
+          path,
+          bytes,
+          fileOptions: FileOptions(
+            contentType: contentType ?? _contentTypeFromExtension(extension),
+            upsert: true,
+          ),
+        );
+    return 'service-images/$path';
   }
 
   Future<List<OrderSummary>> technicianOrders(String technicianId) async {
     final data = await _client
         .from('orders')
         .select(
-          'id, order_number, status, problem_description, schedule_date, schedule_time, estimated_total, final_total, created_at, customer:profiles!customer_id(full_name, phone), address:customer_addresses!address_id(full_address, city), technician:technician_profiles!technician_id(profile:profiles!user_id(full_name))',
+          'id, order_number, technician_id, status, problem_description, schedule_date, schedule_time, estimated_total, final_total, service_fee, created_at, customer:profiles!customer_id(full_name, phone), address:customer_addresses!address_id(full_address, city), technician:technician_profiles!technician_id(profile:profiles!user_id(full_name))',
         )
         .eq('technician_id', technicianId)
         .order('created_at', ascending: false);
@@ -418,9 +620,139 @@ class MarketplaceRepository {
   Future<void> updateOrderStatus(String orderId, String status) async {
     await _client.from('orders').update({'status': status}).eq('id', orderId);
   }
+
+  Future<OrderAttachment> uploadOrderAttachment({
+    required String orderId,
+    required Uint8List bytes,
+    required String fileName,
+    required String caption,
+    String? contentType,
+  }) async {
+    final id = userId;
+    if (id == null) throw StateError('User belum login');
+    final extension = _fileExtension(fileName, contentType);
+    final path =
+        '$id/$orderId/${DateTime.now().millisecondsSinceEpoch}$extension';
+    await _client.storage
+        .from('order-attachments')
+        .uploadBinary(
+          path,
+          bytes,
+          fileOptions: FileOptions(
+            contentType: contentType ?? _contentTypeFromExtension(extension),
+            upsert: true,
+          ),
+        );
+    final row = await _client
+        .from('order_attachments')
+        .insert({
+          'order_id': orderId,
+          'file_url': 'order-attachments/$path',
+          'caption': caption,
+        })
+        .select('id, file_url, caption, created_at')
+        .single();
+    return OrderAttachment.fromJson({
+      ...row,
+      'file_url': await signedOrderAttachmentUrl(
+        row['file_url'] as String? ?? '',
+      ),
+    });
+  }
+
+  Future<String> signedOrderAttachmentUrl(String fileUrl) async {
+    if (fileUrl.startsWith('http')) return fileUrl;
+    final path = fileUrl.replaceFirst('order-attachments/', '');
+    return _client.storage
+        .from('order-attachments')
+        .createSignedUrl(path, 60 * 10);
+  }
+
+  Future<List<WithdrawalRequest>> technicianWithdrawals(
+    String technicianId,
+  ) async {
+    final data = await _client
+        .from('technician_withdrawals')
+        .select(
+          'id, technician_id, amount, bank_name, account_number, account_holder, status, admin_note, requested_at, processed_at',
+        )
+        .eq('technician_id', technicianId)
+        .order('requested_at', ascending: false);
+    return List<Map<String, dynamic>>.from(
+      data,
+    ).map(WithdrawalRequest.fromJson).toList();
+  }
+
+  Future<double> technicianWithdrawableBalance(String technicianId) async {
+    final orders = await _client
+        .from('orders')
+        .select('technician_income')
+        .eq('technician_id', technicianId)
+        .eq('status', 'completed');
+    final withdrawals = await _client
+        .from('technician_withdrawals')
+        .select('amount, status')
+        .eq('technician_id', technicianId)
+        .inFilter('status', ['pending', 'processing', 'paid']);
+    final income = List<Map<String, dynamic>>.from(orders).fold<double>(
+      0,
+      (sum, row) => sum + ((row['technician_income'] as num?)?.toDouble() ?? 0),
+    );
+    final withdrawn = List<Map<String, dynamic>>.from(withdrawals).fold<double>(
+      0,
+      (sum, row) => sum + ((row['amount'] as num?)?.toDouble() ?? 0),
+    );
+    return (income - withdrawn).clamp(0, double.infinity);
+  }
+
+  Future<void> createWithdrawalRequest({
+    required String technicianId,
+    required double amount,
+    required String bankName,
+    required String accountNumber,
+    required String accountHolder,
+  }) async {
+    await _client.from('technician_withdrawals').insert({
+      'technician_id': technicianId,
+      'amount': amount,
+      'bank_name': bankName.trim(),
+      'account_number': accountNumber.trim(),
+      'account_holder': accountHolder.trim(),
+      'status': 'pending',
+    });
+  }
+
+  Future<void> submitReview({
+    required String orderId,
+    required String technicianId,
+    required int rating,
+    required String comment,
+  }) async {
+    final id = userId;
+    if (id == null) throw StateError('User belum login');
+    await _client.from('reviews').insert({
+      'order_id': orderId,
+      'customer_id': id,
+      'technician_id': technicianId,
+      'rating': rating,
+      'comment': comment.trim().isEmpty ? null : comment.trim(),
+    });
+  }
 }
 
 String? _publicCategoryIconUrl(String? path) {
+  return _publicStorageUrl(path, defaultBucket: 'category-images');
+}
+
+String? _publicServiceImageUrl(String? path) {
+  return _publicStorageUrl(path, defaultBucket: 'service-images');
+}
+
+String? _publicProfileImageUrl(String? path) {
+  return _publicStorageUrl(path, defaultBucket: 'profile-images');
+}
+
+String? _publicStorageUrl(String? path, {required String defaultBucket}) {
   if (path == null || path.trim().isEmpty) return null;
   final value = path.trim();
   if (value.startsWith('http')) return value;
@@ -430,7 +762,7 @@ String? _publicCategoryIconUrl(String? path) {
     'service-images',
     'profile-images',
   ];
-  var bucket = 'category-images';
+  var bucket = defaultBucket;
   var objectPath = value;
   for (final candidate in supportedBuckets) {
     final prefix = '$candidate/';
@@ -454,7 +786,7 @@ Map<String, dynamic> _normalizeTechnicianProfileImage(
     ...json,
     'profile': {
       ...profile,
-      'profile_image_url': _publicCategoryIconUrl(
+      'profile_image_url': _publicProfileImageUrl(
         profile['profile_image_url'] as String?,
       ),
     },

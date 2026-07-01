@@ -157,6 +157,40 @@ class EmptyState extends StatelessWidget {
   }
 }
 
+class LoadingState extends StatelessWidget {
+  const LoadingState({this.message = 'Memuat data...', super.key});
+
+  final String message;
+
+  @override
+  Widget build(BuildContext context) {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(32),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const SizedBox(
+              width: 38,
+              height: 38,
+              child: CircularProgressIndicator(strokeWidth: 3),
+            ),
+            const SizedBox(height: 16),
+            Text(
+              message,
+              textAlign: TextAlign.center,
+              style: const TextStyle(
+                color: AppColors.textSecondary,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
 class ErrorState extends StatelessWidget {
   const ErrorState({required this.message, required this.onRetry, super.key});
 
@@ -178,7 +212,7 @@ class ErrorState extends StatelessWidget {
             ),
             const SizedBox(height: 10),
             Text(
-              message,
+              friendlyErrorMessage(message),
               textAlign: TextAlign.center,
               style: const TextStyle(color: AppColors.textSecondary),
             ),
@@ -193,6 +227,28 @@ class ErrorState extends StatelessWidget {
       ),
     );
   }
+}
+
+String friendlyErrorMessage(Object? error) {
+  final raw = '$error';
+  final lower = raw.toLowerCase();
+  if (lower.contains('failed host lookup') ||
+      lower.contains('socketexception') ||
+      lower.contains('network') ||
+      lower.contains('connection')) {
+    return 'Koneksi internet bermasalah. Periksa jaringan lalu coba lagi.';
+  }
+  if (lower.contains('jwt') ||
+      lower.contains('unauthorized') ||
+      lower.contains('invalid api key') ||
+      lower.contains('401')) {
+    return 'Sesi atau konfigurasi akses belum valid. Silakan masuk ulang.';
+  }
+  if (lower.contains('permission') || lower.contains('row-level security')) {
+    return 'Akses data belum diizinkan untuk akun ini.';
+  }
+  if (raw.length > 160) return 'Terjadi kesalahan saat memuat data.';
+  return raw;
 }
 
 class AppLogoMark extends StatelessWidget {

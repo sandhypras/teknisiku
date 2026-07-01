@@ -30,7 +30,7 @@ class _OrderFormPageState extends State<OrderFormPage> {
   final _recipient = TextEditingController();
   final _phone = TextEditingController();
   final _fullAddress = TextEditingController();
-  final _city = TextEditingController(text: 'Solo');
+  final _city = TextEditingController();
   final _district = TextEditingController();
   final _village = TextEditingController();
   final _postalCode = TextEditingController();
@@ -69,6 +69,15 @@ class _OrderFormPageState extends State<OrderFormPage> {
 
   Future<void> _submit() async {
     if (!_formKey.currentState!.validate()) return;
+    if (!_useSavedAddress && (_latitude == null || _longitude == null)) {
+      AppFeedback.warning(
+        context,
+        title: 'Lokasi belum aktif',
+        message:
+            'Tekan Gunakan lokasi saat ini agar sistem menyimpan koordinat pesanan.',
+      );
+      return;
+    }
 
     setState(() => _loading = true);
     try {
@@ -177,10 +186,11 @@ class _OrderFormPageState extends State<OrderFormPage> {
 
   @override
   Widget build(BuildContext context) {
-    final total = widget.services.fold<double>(
+    final subtotal = widget.services.fold<double>(
       0,
       (sum, item) => sum + item.price,
     );
+    final total = subtotal + kServiceFee;
     return Scaffold(
       appBar: AppBar(title: const Text('Form Pemesanan')),
       body: SafeArea(
@@ -191,7 +201,11 @@ class _OrderFormPageState extends State<OrderFormPage> {
             children: [
               _OrderHero(technician: widget.technician, total: total),
               const SizedBox(height: 14),
-              _ServiceSummary(services: widget.services, total: total),
+              _ServiceSummary(
+                services: widget.services,
+                subtotal: subtotal,
+                total: total,
+              ),
               const SizedBox(height: 14),
               _AddressSection(
                 addressesFuture: _addressesFuture,
@@ -340,9 +354,14 @@ class _OrderHero extends StatelessWidget {
 }
 
 class _ServiceSummary extends StatelessWidget {
-  const _ServiceSummary({required this.services, required this.total});
+  const _ServiceSummary({
+    required this.services,
+    required this.subtotal,
+    required this.total,
+  });
 
   final List<TechnicianService> services;
+  final double subtotal;
   final double total;
 
   @override
@@ -362,11 +381,22 @@ class _ServiceSummary extends StatelessWidget {
                     color: AppColors.secondary.withValues(alpha: 0.10),
                     borderRadius: BorderRadius.circular(14),
                   ),
-                  child: Icon(
-                    categoryIcon(service.categoryName ?? service.name),
-                    color: AppColors.secondary,
-                    size: 22,
-                  ),
+                  clipBehavior: Clip.antiAlias,
+                  child: service.imageUrl?.isNotEmpty == true
+                      ? Image.network(
+                          service.imageUrl!,
+                          fit: BoxFit.cover,
+                          errorBuilder: (_, _, _) => Icon(
+                            categoryIcon(service.categoryName ?? service.name),
+                            color: AppColors.secondary,
+                            size: 22,
+                          ),
+                        )
+                      : Icon(
+                          categoryIcon(service.categoryName ?? service.name),
+                          color: AppColors.secondary,
+                          size: 22,
+                        ),
                 ),
                 const SizedBox(width: 12),
                 Expanded(
@@ -410,6 +440,13 @@ class _ServiceSummary extends StatelessWidget {
             padding: EdgeInsets.symmetric(vertical: 12),
             child: Divider(height: 1),
           ),
+          _MoneyRow(label: 'Subtotal jasa', amount: subtotal),
+          const SizedBox(height: 8),
+          _MoneyRow(label: 'Biaya layanan', amount: kServiceFee),
+          const Padding(
+            padding: EdgeInsets.symmetric(vertical: 12),
+            child: Divider(height: 1),
+          ),
           Row(
             children: [
               const Expanded(
@@ -430,6 +467,37 @@ class _ServiceSummary extends StatelessWidget {
           ),
         ],
       ),
+    );
+  }
+}
+
+class _MoneyRow extends StatelessWidget {
+  const _MoneyRow({required this.label, required this.amount});
+
+  final String label;
+  final double amount;
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: [
+        Expanded(
+          child: Text(
+            label,
+            style: const TextStyle(
+              color: AppColors.textSecondary,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+        ),
+        Text(
+          formatRupiah(amount),
+          style: const TextStyle(
+            color: AppColors.textPrimary,
+            fontWeight: FontWeight.w800,
+          ),
+        ),
+      ],
     );
   }
 }

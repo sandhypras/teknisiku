@@ -4,6 +4,7 @@ import '../../app/theme.dart';
 import '../../core/models/mobile_models.dart';
 import '../../core/services/marketplace_repository.dart';
 import '../../shared/mobile_ui.dart';
+import '../notifications/notifications_page.dart';
 
 class TechnicianDashboardPage extends StatefulWidget {
   const TechnicianDashboardPage({
@@ -208,24 +209,30 @@ class _TechnicianBrandHeader extends StatelessWidget {
             ],
           ),
         ),
-        Stack(
-          clipBehavior: Clip.none,
-          children: [
-            const _SquareIcon(icon: Icons.notifications_none_rounded),
-            Positioned(
-              right: 8,
-              top: 8,
-              child: Container(
-                width: 10,
-                height: 10,
-                decoration: BoxDecoration(
-                  color: const Color(0xFFFF3030),
-                  shape: BoxShape.circle,
-                  border: Border.all(color: Colors.white, width: 1.5),
+        InkWell(
+          onTap: () => Navigator.of(
+            context,
+          ).push(MaterialPageRoute(builder: (_) => const NotificationsPage())),
+          borderRadius: BorderRadius.circular(18),
+          child: Stack(
+            clipBehavior: Clip.none,
+            children: [
+              const _SquareIcon(icon: Icons.notifications_none_rounded),
+              Positioned(
+                right: 8,
+                top: 8,
+                child: Container(
+                  width: 10,
+                  height: 10,
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFFF3030),
+                    shape: BoxShape.circle,
+                    border: Border.all(color: Colors.white, width: 1.5),
+                  ),
                 ),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
       ],
     );
@@ -930,10 +937,7 @@ class _TechnicianDashboardData {
 String _nextStatus(String status) => switch (status) {
   'accepted' => 'on_the_way',
   'on_the_way' => 'inspection',
-  'inspection' => 'waiting_price_approval',
-  'waiting_price_approval' => 'in_progress',
   'in_progress' => 'waiting_payment',
-  'waiting_payment' => 'completed',
   _ => status,
 };
 

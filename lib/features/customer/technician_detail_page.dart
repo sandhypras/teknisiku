@@ -6,6 +6,7 @@ import '../../app/theme.dart';
 import '../../core/models/mobile_models.dart';
 import '../../core/services/marketplace_repository.dart';
 import '../../shared/mobile_ui.dart';
+import '../notifications/notifications_page.dart';
 import 'order_form_page.dart';
 
 class TechnicianDetailPage extends StatefulWidget {
@@ -44,90 +45,103 @@ class _TechnicianDetailPageState extends State<TechnicianDetailPage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFFF4F9FF),
-      body: SafeArea(
-        child: FutureBuilder<_TechnicianDetailData>(
-          future: _future,
-          builder: (context, snapshot) {
-            if (snapshot.connectionState == ConnectionState.waiting) {
-              return const Center(child: CircularProgressIndicator());
-            }
-            if (snapshot.hasError) {
-              return ErrorState(
-                message: snapshot.error.toString(),
-                onRetry: () => setState(() {
-                  _future = _load();
-                }),
-              );
-            }
-            final data = snapshot.data!;
-            final selected = data.services
-                .where((item) => _selectedServiceIds.contains(item.id))
-                .toList();
-            return Stack(
-              children: [
-                CustomScrollView(
-                  slivers: [
-                    SliverToBoxAdapter(
-                      child: _DetailHero(technician: data.technician),
+      backgroundColor: const Color(0xFFF7FBFF),
+      body: DecoratedBox(
+        decoration: const BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topCenter,
+            end: Alignment.bottomCenter,
+            colors: [Color(0xFFEAF4FF), Color(0xFFFAFCFF), Colors.white],
+            stops: [0, 0.42, 0.78],
+          ),
+        ),
+        child: SafeArea(
+          child: FutureBuilder<_TechnicianDetailData>(
+            future: _future,
+            builder: (context, snapshot) {
+              if (snapshot.connectionState == ConnectionState.waiting) {
+                return const Center(child: CircularProgressIndicator());
+              }
+              if (snapshot.hasError) {
+                return ErrorState(
+                  message: snapshot.error.toString(),
+                  onRetry: () => setState(() {
+                    _future = _load();
+                  }),
+                );
+              }
+              final data = snapshot.data!;
+              final selected = data.services
+                  .where((item) => _selectedServiceIds.contains(item.id))
+                  .toList();
+              return Stack(
+                children: [
+                  CustomScrollView(
+                    physics: const BouncingScrollPhysics(
+                      parent: AlwaysScrollableScrollPhysics(),
                     ),
-                    SliverPersistentHeader(
-                      pinned: true,
-                      delegate: _TabsHeaderDelegate(
-                        tab: _tab,
-                        onChanged: (value) => setState(() => _tab = value),
-                        reviewCount: data.technician.completedJobs,
-                      ),
-                    ),
-                    if (_tab == 0)
-                      _ServicesSliver(
-                        services: data.services,
-                        selectedIds: _selectedServiceIds,
-                        onTap: (service) => setState(() {
-                          if (_selectedServiceIds.contains(service.id)) {
-                            _selectedServiceIds.remove(service.id);
-                          } else {
-                            _selectedServiceIds.add(service.id);
-                          }
-                        }),
-                      )
-                    else if (_tab == 1)
+                    slivers: [
                       SliverToBoxAdapter(
-                        child: _ReviewsPanel(technician: data.technician),
-                      )
-                    else
-                      SliverToBoxAdapter(
-                        child: _ProfilePanel(technician: data.technician),
+                        child: _DetailHero(technician: data.technician),
                       ),
-                    const SliverToBoxAdapter(child: SizedBox(height: 106)),
-                  ],
-                ),
-                Align(
-                  alignment: Alignment.bottomCenter,
-                  child: _BookingBar(
-                    selected: selected,
-                    onPressed: selected.isEmpty
-                        ? null
-                        : () {
-                            if (Supabase.instance.client.auth.currentUser ==
-                                null) {
-                              Navigator.pushNamed(context, AppRoutes.login);
-                              return;
+                      SliverPersistentHeader(
+                        pinned: true,
+                        delegate: _TabsHeaderDelegate(
+                          tab: _tab,
+                          onChanged: (value) => setState(() => _tab = value),
+                          reviewCount: data.technician.completedJobs,
+                        ),
+                      ),
+                      if (_tab == 0)
+                        _ServicesSliver(
+                          services: data.services,
+                          selectedIds: _selectedServiceIds,
+                          onTap: (service) => setState(() {
+                            if (_selectedServiceIds.contains(service.id)) {
+                              _selectedServiceIds.remove(service.id);
+                            } else {
+                              _selectedServiceIds.add(service.id);
                             }
-                            Navigator.of(context).push(
-                              MaterialPageRoute(
-                                builder: (_) => OrderFormPage(
-                                  technician: data.technician,
-                                  services: selected,
-                                ),
-                              ),
-                            );
-                          },
+                          }),
+                        )
+                      else if (_tab == 1)
+                        SliverToBoxAdapter(
+                          child: _ReviewsPanel(technician: data.technician),
+                        )
+                      else
+                        SliverToBoxAdapter(
+                          child: _ProfilePanel(technician: data.technician),
+                        ),
+                      const SliverToBoxAdapter(child: SizedBox(height: 112)),
+                    ],
                   ),
-                ),
-              ],
-            );
-          },
+                  Align(
+                    alignment: Alignment.bottomCenter,
+                    child: _BookingBar(
+                      selected: selected,
+                      onPressed: selected.isEmpty
+                          ? null
+                          : () {
+                              if (Supabase.instance.client.auth.currentUser ==
+                                  null) {
+                                Navigator.pushNamed(context, AppRoutes.login);
+                                return;
+                              }
+                              Navigator.of(context).push(
+                                MaterialPageRoute(
+                                  builder: (_) => OrderFormPage(
+                                    technician: data.technician,
+                                    services: selected,
+                                  ),
+                                ),
+                              );
+                            },
+                    ),
+                  ),
+                ],
+              );
+            },
+          ),
         ),
       ),
     );
@@ -145,7 +159,7 @@ class _DetailHero extends StatelessWidget {
         ? 'Spesialis Perbaikan Perangkat'
         : 'Spesialis ${technician.skills.take(2).join(' & ')}';
     return Padding(
-      padding: const EdgeInsets.fromLTRB(20, 14, 20, 18),
+      padding: const EdgeInsets.fromLTRB(20, 14, 20, 20),
       child: Column(
         children: [
           Row(
@@ -183,10 +197,15 @@ class _DetailHero extends StatelessWidget {
                 ],
               ),
               const Spacer(),
-              _SoftIconButton(icon: Icons.notifications_none_rounded),
+              _SoftIconButton(
+                icon: Icons.notifications_none_rounded,
+                onPressed: () => Navigator.of(context).push(
+                  MaterialPageRoute(builder: (_) => const NotificationsPage()),
+                ),
+              ),
             ],
           ),
-          const SizedBox(height: 28),
+          const SizedBox(height: 30),
           Row(
             crossAxisAlignment: CrossAxisAlignment.center,
             children: [
@@ -209,17 +228,8 @@ class _DetailHero extends StatelessWidget {
                         ),
                       ],
                     ),
-                    child: CircleAvatar(
-                      backgroundColor: const Color(0xFFEAF4FF),
-                      child: Text(
-                        _initials(technician.name),
-                        style: const TextStyle(
-                          color: AppColors.primary,
-                          fontSize: 36,
-                          fontWeight: FontWeight.w900,
-                        ),
-                      ),
-                    ),
+                    clipBehavior: Clip.antiAlias,
+                    child: _TechnicianProfilePhoto(technician: technician),
                   ),
                   Positioned(
                     right: 5,
@@ -240,7 +250,7 @@ class _DetailHero extends StatelessWidget {
                   ),
                 ],
               ),
-              const SizedBox(width: 22),
+              const SizedBox(width: 24),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -307,7 +317,7 @@ class _DetailHero extends StatelessWidget {
               ),
             ],
           ),
-          const SizedBox(height: 28),
+          const SizedBox(height: 30),
           Row(
             children: [
               Expanded(
@@ -331,6 +341,50 @@ class _DetailHero extends StatelessWidget {
             ],
           ),
         ],
+      ),
+    );
+  }
+}
+
+class _TechnicianProfilePhoto extends StatelessWidget {
+  const _TechnicianProfilePhoto({required this.technician});
+
+  final TechnicianSummary technician;
+
+  @override
+  Widget build(BuildContext context) {
+    final imageUrl = technician.profileImageUrl;
+    if (imageUrl == null || imageUrl.isEmpty) {
+      return _TechnicianInitials(name: technician.name);
+    }
+    return Image.network(
+      imageUrl,
+      width: double.infinity,
+      height: double.infinity,
+      fit: BoxFit.cover,
+      errorBuilder: (_, _, _) => _TechnicianInitials(name: technician.name),
+    );
+  }
+}
+
+class _TechnicianInitials extends StatelessWidget {
+  const _TechnicianInitials({required this.name});
+
+  final String name;
+
+  @override
+  Widget build(BuildContext context) {
+    return ColoredBox(
+      color: const Color(0xFFEAF4FF),
+      child: Center(
+        child: Text(
+          _initials(name),
+          style: const TextStyle(
+            color: AppColors.primary,
+            fontSize: 36,
+            fontWeight: FontWeight.w900,
+          ),
+        ),
       ),
     );
   }
@@ -377,10 +431,10 @@ class _TabsHeaderDelegate extends SliverPersistentHeaderDelegate {
   final int reviewCount;
 
   @override
-  double get minExtent => 82;
+  double get minExtent => 84;
 
   @override
-  double get maxExtent => 82;
+  double get maxExtent => 84;
 
   @override
   Widget build(
@@ -391,7 +445,7 @@ class _TabsHeaderDelegate extends SliverPersistentHeaderDelegate {
     return Container(
       decoration: const BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+        borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
         boxShadow: [
           BoxShadow(
             color: Color(0x120A2F5F),
@@ -445,7 +499,7 @@ class _TabButton extends StatelessWidget {
       child: InkWell(
         onTap: onTap,
         child: SizedBox(
-          height: 82,
+          height: 84,
           child: Stack(
             alignment: Alignment.center,
             children: [
@@ -458,7 +512,7 @@ class _TabButton extends StatelessWidget {
                 ),
               ),
               Positioned(
-                bottom: 12,
+                bottom: 10,
                 child: AnimatedContainer(
                   duration: const Duration(milliseconds: 180),
                   width: selected ? 104 : 0,
@@ -556,19 +610,34 @@ class _ServiceDetailCard extends StatelessWidget {
           child: Row(
             children: [
               Container(
-                width: 96,
-                height: 96,
+                width: 104,
+                height: 104,
                 decoration: BoxDecoration(
-                  color: const Color(0xFFEAF4FF),
-                  borderRadius: BorderRadius.circular(16),
+                  gradient: const LinearGradient(
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                    colors: [Color(0xFFEAF4FF), Color(0xFFF7FBFF)],
+                  ),
+                  borderRadius: BorderRadius.circular(20),
                 ),
-                child: Icon(
-                  categoryIcon(service.categoryName ?? service.name),
-                  color: AppColors.primary,
-                  size: 52,
-                ),
+                clipBehavior: Clip.antiAlias,
+                child: service.imageUrl?.isNotEmpty == true
+                    ? Image.network(
+                        service.imageUrl!,
+                        fit: BoxFit.cover,
+                        errorBuilder: (_, _, _) => Icon(
+                          categoryIcon(service.categoryName ?? service.name),
+                          color: AppColors.primary,
+                          size: 56,
+                        ),
+                      )
+                    : Icon(
+                        categoryIcon(service.categoryName ?? service.name),
+                        color: AppColors.primary,
+                        size: 56,
+                      ),
               ),
-              const SizedBox(width: 15),
+              const SizedBox(width: 16),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -595,7 +664,7 @@ class _ServiceDetailCard extends StatelessWidget {
                         ),
                       ],
                     ),
-                    const SizedBox(height: 7),
+                    const SizedBox(height: 8),
                     Text(
                       service.description?.isNotEmpty == true
                           ? service.description!
@@ -608,7 +677,7 @@ class _ServiceDetailCard extends StatelessWidget {
                         fontWeight: FontWeight.w600,
                       ),
                     ),
-                    const SizedBox(height: 12),
+                    const SizedBox(height: 14),
                     Row(
                       children: [
                         const Icon(
@@ -625,7 +694,7 @@ class _ServiceDetailCard extends StatelessWidget {
                             height: 1.1,
                           ),
                         ),
-                        const SizedBox(width: 20),
+                        const SizedBox(width: 18),
                         const Icon(
                           Icons.schedule_rounded,
                           color: AppColors.primary,
@@ -662,9 +731,13 @@ class _WarrantyCard extends StatelessWidget {
   Widget build(BuildContext context) {
     return Container(
       margin: const EdgeInsets.fromLTRB(20, 2, 20, 18),
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.all(18),
       decoration: BoxDecoration(
-        color: const Color(0xFFEAF4FF),
+        gradient: const LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [Color(0xFFEAF4FF), Color(0xFFF8FCFF)],
+        ),
         borderRadius: BorderRadius.circular(18),
         border: Border.all(color: const Color(0xFFD5E8FF)),
       ),
@@ -817,11 +890,10 @@ class _BookingBar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final total = selected.fold<double>(0, (sum, item) => sum + item.price);
     return Container(
       padding: const EdgeInsets.fromLTRB(20, 12, 20, 16),
       decoration: BoxDecoration(
-        color: Colors.white.withValues(alpha: 0.96),
+        color: Colors.white.withValues(alpha: 0.98),
         boxShadow: [
           BoxShadow(
             color: const Color(0xFF234D79).withValues(alpha: 0.10),
@@ -832,14 +904,12 @@ class _BookingBar extends StatelessWidget {
       ),
       child: SizedBox(
         width: double.infinity,
-        height: 58,
+        height: 60,
         child: FilledButton.icon(
           onPressed: onPressed,
           icon: const Icon(Icons.calendar_month_rounded),
           label: Text(
-            selected.isEmpty
-                ? 'Pilih Layanan'
-                : 'Pesan Teknisi - ${formatRupiah(total)}',
+            selected.isEmpty ? 'Pesan Teknisi' : 'Pesan Teknisi',
             style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w900),
           ),
         ),

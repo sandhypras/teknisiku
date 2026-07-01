@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../../shared/widgets/app_feedback.dart';
@@ -145,7 +146,10 @@ class _AdminCustomersScreenState extends State<AdminCustomersScreen> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   _DetailLine('Email', customer['email'] as String? ?? '-'),
-                  _DetailLine('Telepon', customer['phone'] as String? ?? '-'),
+                  _CopyableDetailLine(
+                    'Telepon',
+                    customer['phone'] as String? ?? '-',
+                  ),
                   _DetailLine(
                     'Status',
                     (customer['is_active'] as bool? ?? true)
@@ -518,6 +522,54 @@ class _DetailLine extends StatelessWidget {
               style: const TextStyle(fontWeight: FontWeight.w700),
             ),
           ),
+        ],
+      ),
+    );
+  }
+}
+
+class _CopyableDetailLine extends StatelessWidget {
+  const _CopyableDetailLine(this.label, this.value);
+
+  final String label;
+  final String value;
+
+  @override
+  Widget build(BuildContext context) {
+    final canCopy = value.trim().isNotEmpty && value != '-';
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 6),
+      child: Row(
+        children: [
+          SizedBox(
+            width: 92,
+            child: Text(
+              label,
+              style: const TextStyle(color: AppColors.textSecondary),
+            ),
+          ),
+          Expanded(
+            child: Text(
+              value,
+              style: const TextStyle(fontWeight: FontWeight.w700),
+            ),
+          ),
+          if (canCopy)
+            IconButton(
+              tooltip: 'Copy nomor telepon',
+              visualDensity: VisualDensity.compact,
+              onPressed: () async {
+                await Clipboard.setData(ClipboardData(text: value));
+                if (context.mounted) {
+                  AppFeedback.success(
+                    context,
+                    title: 'Nomor disalin',
+                    message: value,
+                  );
+                }
+              },
+              icon: const Icon(Icons.copy_rounded, size: 17),
+            ),
         ],
       ),
     );

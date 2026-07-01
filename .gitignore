@@ -37,6 +37,9 @@ migrate_working_dir/
 .env
 .env.*
 !.env.example
+.supabase-fcm.env
+firebase-service-account.json
+*-firebase-adminsdk-*.json
 
 # Codex local workspace
 work/

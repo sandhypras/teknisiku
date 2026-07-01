@@ -328,53 +328,63 @@ class _CategoryGrid extends StatelessWidget {
       );
     }
     final visible = categories.take(6).toList();
-    return GridView.builder(
-      itemCount: visible.length,
-      shrinkWrap: true,
-      physics: const NeverScrollableScrollPhysics(),
-      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-        crossAxisCount: 3,
-        mainAxisSpacing: 12,
-        crossAxisSpacing: 12,
-        childAspectRatio: 0.96,
-      ),
-      itemBuilder: (context, index) {
-        final category = visible[index];
-        return Container(
-          decoration: _softDecoration(radius: 16),
-          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 13),
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              _CategoryIcon(category: category),
-              const SizedBox(height: 10),
-              Text(
-                category.name,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                textAlign: TextAlign.center,
-                style: const TextStyle(
-                  color: Color(0xFF07143D),
-                  fontSize: 14,
-                  fontWeight: FontWeight.w900,
-                  height: 1.05,
-                ),
-              ),
-              const SizedBox(height: 4),
-              Text(
-                _categorySubtitle(category.name),
-                maxLines: 2,
-                overflow: TextOverflow.ellipsis,
-                textAlign: TextAlign.center,
-                style: const TextStyle(
-                  color: Color(0xFF59657C),
-                  fontSize: 11,
-                  fontWeight: FontWeight.w600,
-                  height: 1.18,
-                ),
-              ),
-            ],
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final compact = constraints.maxWidth < 350;
+        return GridView.builder(
+          itemCount: visible.length,
+          shrinkWrap: true,
+          physics: const NeverScrollableScrollPhysics(),
+          gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+            crossAxisCount: 3,
+            mainAxisSpacing: 12,
+            crossAxisSpacing: 12,
+            childAspectRatio: compact ? 0.70 : 0.76,
           ),
+          itemBuilder: (context, index) {
+            final category = visible[index];
+            return Container(
+              decoration: _softDecoration(radius: 16),
+              padding: EdgeInsets.symmetric(
+                horizontal: compact ? 6 : 8,
+                vertical: compact ? 9 : 11,
+              ),
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  _CategoryIcon(category: category, compact: compact),
+                  SizedBox(height: compact ? 8 : 10),
+                  Text(
+                    category.name,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                      color: const Color(0xFF07143D),
+                      fontSize: compact ? 12.5 : 14,
+                      fontWeight: FontWeight.w900,
+                      height: 1.05,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Flexible(
+                    child: Text(
+                      _categorySubtitle(category.name),
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      textAlign: TextAlign.center,
+                      style: TextStyle(
+                        color: const Color(0xFF59657C),
+                        fontSize: compact ? 10.5 : 11,
+                        fontWeight: FontWeight.w600,
+                        height: 1.15,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            );
+          },
         );
       },
     );
@@ -382,34 +392,38 @@ class _CategoryGrid extends StatelessWidget {
 }
 
 class _CategoryIcon extends StatelessWidget {
-  const _CategoryIcon({required this.category});
+  const _CategoryIcon({required this.category, this.compact = false});
 
   final ServiceCategory category;
+  final bool compact;
 
   @override
   Widget build(BuildContext context) {
     final iconUrl = category.iconUrl;
     return Container(
-      width: 52,
-      height: 52,
-      padding: const EdgeInsets.all(8),
+      width: compact ? 46 : 52,
+      height: compact ? 46 : 52,
+      padding: EdgeInsets.all(iconUrl == null || iconUrl.isEmpty ? 8 : 4),
       decoration: BoxDecoration(
         color: const Color(0xFFEAF4FF),
         borderRadius: BorderRadius.circular(16),
       ),
+      clipBehavior: Clip.antiAlias,
       child: iconUrl == null || iconUrl.isEmpty
           ? Icon(
               categoryIcon(category.name),
               color: const Color(0xFF1269D3),
-              size: 36,
+              size: compact ? 32 : 36,
             )
           : Image.network(
               iconUrl,
+              width: double.infinity,
+              height: double.infinity,
               fit: BoxFit.contain,
               errorBuilder: (_, _, _) => Icon(
                 categoryIcon(category.name),
                 color: const Color(0xFF1269D3),
-                size: 36,
+                size: compact ? 32 : 36,
               ),
             ),
     );
@@ -425,16 +439,20 @@ class _TechnicianStrip extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return SizedBox(
-      height: 178,
+      height: 162,
       child: ListView.separated(
         scrollDirection: Axis.horizontal,
-        itemCount: technicians.take(6).length,
+        physics: const BouncingScrollPhysics(),
+        itemCount: technicians.length,
         separatorBuilder: (_, _) => const SizedBox(width: 12),
         itemBuilder: (context, index) {
           final technician = technicians[index];
-          return _TechnicianCard(
-            technician: technician,
-            onTap: () => onTap(technician),
+          return SizedBox(
+            width: 184,
+            child: _TechnicianCard(
+              technician: technician,
+              onTap: () => onTap(technician),
+            ),
           );
         },
       ),
@@ -450,162 +468,169 @@ class _TechnicianCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final rating = technician.rating == 0
-        ? 'Baru'
-        : technician.rating.toStringAsFixed(1);
-    final mainSkill = technician.skills.isEmpty
+    final isNew = technician.rating == 0;
+    final rating = isNew ? 'Baru' : technician.rating.toStringAsFixed(1);
+    final imageUrl = technician.profileImageUrl;
+    final skill = technician.skills.isEmpty
         ? 'Spesialis Teknisi'
         : 'Spesialis ${technician.skills.take(2).join(' & ')}';
-    return SizedBox(
-      width: 205,
-      child: Material(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
-        child: InkWell(
-          borderRadius: BorderRadius.circular(16),
-          onTap: onTap,
-          child: Container(
-            decoration: _softDecoration(radius: 16),
-            padding: const EdgeInsets.all(12),
-            child: Column(
-              children: [
-                Row(
-                  children: [
-                    Stack(
-                      clipBehavior: Clip.none,
-                      children: [
-                        Container(
-                          width: 64,
-                          height: 64,
-                          decoration: const BoxDecoration(
-                            color: Color(0xFFE3EEF9),
+
+    return Material(
+      color: Colors.white,
+      borderRadius: BorderRadius.circular(18),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(18),
+        onTap: onTap,
+        child: Container(
+          height: 156,
+          decoration: _softDecoration(radius: 18),
+          padding: const EdgeInsets.all(13),
+          child: Column(
+            children: [
+              Row(
+                children: [
+                  Stack(
+                    clipBehavior: Clip.none,
+                    children: [
+                      Container(
+                        width: 62,
+                        height: 62,
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          color: const Color(0xFFEAF4FF),
+                          border: Border.all(color: Colors.white, width: 3),
+                          boxShadow: [
+                            BoxShadow(
+                              color: const Color(
+                                0xFF234D79,
+                              ).withValues(alpha: 0.12),
+                              blurRadius: 10,
+                              offset: const Offset(0, 5),
+                            ),
+                          ],
+                        ),
+                        clipBehavior: Clip.antiAlias,
+                        child: imageUrl != null && imageUrl.isNotEmpty
+                            ? Image.network(
+                                imageUrl,
+                                fit: BoxFit.cover,
+                                errorBuilder: (_, _, _) => const Icon(
+                                  Icons.engineering_rounded,
+                                  color: Color(0xFF1269D3),
+                                  size: 32,
+                                ),
+                              )
+                            : const Icon(
+                                Icons.engineering_rounded,
+                                color: Color(0xFF1269D3),
+                                size: 32,
+                              ),
+                      ),
+                      Positioned(
+                        right: 0,
+                        bottom: 2,
+                        child: Container(
+                          width: 14,
+                          height: 14,
+                          decoration: BoxDecoration(
+                            color: const Color(0xFF12B956),
                             shape: BoxShape.circle,
-                          ),
-                          child: const Icon(
-                            Icons.engineering_rounded,
-                            color: Color(0xFF1269D3),
-                            size: 38,
+                            border: Border.all(color: Colors.white, width: 2),
                           ),
                         ),
-                        Positioned(
-                          right: 1,
-                          bottom: 2,
-                          child: Container(
-                            width: 14,
-                            height: 14,
-                            decoration: BoxDecoration(
-                              color: const Color(0xFF12B956),
-                              shape: BoxShape.circle,
-                              border: Border.all(color: Colors.white, width: 2),
-                            ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          technician.name,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(
+                            color: Color(0xFF07143D),
+                            fontSize: 15,
+                            fontWeight: FontWeight.w900,
+                            height: 1.1,
                           ),
+                        ),
+                        const SizedBox(height: 5),
+                        Row(
+                          children: [
+                            Icon(
+                              isNew
+                                  ? Icons.auto_awesome_rounded
+                                  : Icons.star_rounded,
+                              color: isNew
+                                  ? const Color(0xFF6A748B)
+                                  : const Color(0xFFFFB20E),
+                              size: 17,
+                            ),
+                            const SizedBox(width: 4),
+                            Flexible(
+                              child: Text(
+                                isNew
+                                    ? 'Baru'
+                                    : '$rating (${technician.completedJobs})',
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: const TextStyle(
+                                  color: Color(0xFF263A63),
+                                  fontSize: 13,
+                                  fontWeight: FontWeight.w800,
+                                ),
+                              ),
+                            ),
+                          ],
                         ),
                       ],
                     ),
-                    const SizedBox(width: 10),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            technician.name,
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: const TextStyle(
-                              color: Color(0xFF07143D),
-                              fontSize: 15,
-                              fontWeight: FontWeight.w900,
-                            ),
-                          ),
-                          const SizedBox(height: 5),
-                          Row(
-                            children: [
-                              const Icon(
-                                Icons.star_rounded,
-                                color: Color(0xFFFFB20E),
-                                size: 18,
-                              ),
-                              const SizedBox(width: 3),
-                              Text(
-                                rating,
-                                style: const TextStyle(
-                                  color: Color(0xFF07143D),
-                                  fontWeight: FontWeight.w900,
-                                ),
-                              ),
-                              Text(
-                                technician.completedJobs > 0
-                                    ? ' (${technician.completedJobs})'
-                                    : '',
-                                style: const TextStyle(
-                                  color: Color(0xFF6A748B),
-                                  fontSize: 12,
-                                ),
-                              ),
-                            ],
-                          ),
-                          const SizedBox(height: 6),
-                          Text(
-                            mainSkill,
-                            maxLines: 2,
-                            overflow: TextOverflow.ellipsis,
-                            style: const TextStyle(
-                              color: Color(0xFF59657C),
-                              fontSize: 12,
-                              fontWeight: FontWeight.w600,
-                              height: 1.15,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ],
+                  ),
+                ],
+              ),
+              const SizedBox(height: 10),
+              Text(
+                skill,
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(
+                  color: Color(0xFF59657C),
+                  fontSize: 12,
+                  fontWeight: FontWeight.w600,
+                  height: 1.25,
                 ),
-                const SizedBox(height: 9),
-                Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 9,
-                    vertical: 4,
+              ),
+              const Spacer(),
+              Container(height: 1, color: const Color(0xFFE4ECF6)),
+              const SizedBox(height: 9),
+              Row(
+                children: [
+                  const Text(
+                    'Area',
+                    style: TextStyle(
+                      color: Color(0xFF6A748B),
+                      fontSize: 11,
+                      fontWeight: FontWeight.w600,
+                    ),
                   ),
-                  decoration: BoxDecoration(
-                    color: const Color(0xFFEAF4FF),
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  child: Text(
+                  const Spacer(),
+                  Text(
                     technician.serviceArea,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    textAlign: TextAlign.right,
                     style: const TextStyle(
-                      color: Color(0xFF0964CC),
+                      color: Color(0xFF1269D3),
                       fontSize: 12,
-                      fontWeight: FontWeight.w800,
+                      fontWeight: FontWeight.w900,
                     ),
                   ),
-                ),
-                const Spacer(),
-                const Divider(height: 18, color: Color(0xFFE1E8F0)),
-                Row(
-                  children: [
-                    const Expanded(
-                      child: Text(
-                        'Mulai dari',
-                        style: TextStyle(
-                          color: Color(0xFF59657C),
-                          fontSize: 12,
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                    ),
-                    Text(
-                      technician.completedJobs > 0 ? 'Rp75.000' : 'Rp100.000',
-                      style: const TextStyle(
-                        color: Color(0xFF006FE6),
-                        fontSize: 17,
-                        fontWeight: FontWeight.w900,
-                      ),
-                    ),
-                  ],
-                ),
-              ],
-            ),
+                ],
+              ),
+            ],
           ),
         ),
       ),

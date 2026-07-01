@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../../shared/widgets/app_feedback.dart';
@@ -38,7 +39,7 @@ class _AdminOrdersScreenState extends State<AdminOrdersScreen> {
     final q = Supabase.instance.client
         .from('orders')
         .select(
-          'id, order_number, status, schedule_date, schedule_time, problem_description, estimated_total, final_total, commission_percentage, commission_amount, technician_income, created_at, customer:profiles!customer_id(full_name, phone), address:customer_addresses!address_id(full_address, city), technician:technician_profiles!technician_id(profile:profiles!user_id(full_name))',
+          'id, order_number, status, schedule_date, schedule_time, problem_description, estimated_total, final_total, service_fee, commission_percentage, commission_amount, technician_income, created_at, customer:profiles!customer_id(full_name, phone), address:customer_addresses!address_id(full_address, city), technician:technician_profiles!technician_id(profile:profiles!user_id(full_name))',
         );
     final data = status != null
         ? await q
@@ -143,7 +144,7 @@ class _AdminOrdersScreenState extends State<AdminOrdersScreen> {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               _DetailLine('Customer', '${customer?['full_name'] ?? '-'}'),
-              _DetailLine('Telepon', '${customer?['phone'] ?? '-'}'),
+              _CopyableDetailLine('Telepon', '${customer?['phone'] ?? '-'}'),
               _DetailLine('Teknisi', '${techProfile?['full_name'] ?? '-'}'),
               _DetailLine('Status', data['status'] as String? ?? '-'),
               _DetailLine(
@@ -159,6 +160,10 @@ class _AdminOrdersScreenState extends State<AdminOrdersScreen> {
                 _OrderCard._fmt(
                   (data['estimated_total'] as num?)?.toDouble() ?? 0,
                 ),
+              ),
+              _DetailLine(
+                'Biaya Layanan',
+                _OrderCard._fmt((data['service_fee'] as num?)?.toDouble() ?? 0),
               ),
               _DetailLine(
                 'Total',
@@ -542,6 +547,55 @@ class _DetailLine extends StatelessWidget {
               style: const TextStyle(fontWeight: FontWeight.w700),
             ),
           ),
+        ],
+      ),
+    );
+  }
+}
+
+class _CopyableDetailLine extends StatelessWidget {
+  const _CopyableDetailLine(this.label, this.value);
+
+  final String label;
+  final String value;
+
+  @override
+  Widget build(BuildContext context) {
+    final canCopy = value.trim().isNotEmpty && value != '-';
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 8),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          SizedBox(
+            width: 90,
+            child: Text(
+              label,
+              style: const TextStyle(color: AppColors.textSecondary),
+            ),
+          ),
+          Expanded(
+            child: Text(
+              value,
+              style: const TextStyle(fontWeight: FontWeight.w700),
+            ),
+          ),
+          if (canCopy)
+            IconButton(
+              tooltip: 'Copy nomor telepon',
+              visualDensity: VisualDensity.compact,
+              onPressed: () async {
+                await Clipboard.setData(ClipboardData(text: value));
+                if (context.mounted) {
+                  AppFeedback.success(
+                    context,
+                    title: 'Nomor disalin',
+                    message: value,
+                  );
+                }
+              },
+              icon: const Icon(Icons.copy_rounded, size: 17),
+            ),
         ],
       ),
     );

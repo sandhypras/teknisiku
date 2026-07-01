@@ -5,6 +5,7 @@ import '../core/config/app_config.dart';
 import '../core/models/app_user_profile.dart' as admin_models;
 import '../core/models/mobile_models.dart';
 import '../core/services/auth_service.dart';
+import '../core/services/push_notification_service.dart';
 import '../features/auth/login_page.dart';
 import '../features/auth/register_customer_page.dart';
 import '../features/auth/register_technician_page.dart';
@@ -55,6 +56,7 @@ class AuthGate extends StatefulWidget {
 class _AuthGateState extends State<AuthGate> {
   late Future<AppProfile?> _profileFuture = widget.authService.currentProfile();
   String? _profileUserId;
+  String? _pushRegisteredUserId;
   var _showLoginMenu = false;
 
   void _reloadProfile() {
@@ -72,6 +74,7 @@ class _AuthGateState extends State<AuthGate> {
         final session = widget.authService.currentSession;
         if (session == null) {
           _profileUserId = null;
+          _pushRegisteredUserId = null;
           if (!_showLoginMenu) {
             return OnboardingPage(
               onContinue: () => setState(() => _showLoginMenu = true),
@@ -96,6 +99,7 @@ class _AuthGateState extends State<AuthGate> {
             if (!profile.isActive) {
               return _InactiveAccountPage(authService: widget.authService);
             }
+            _syncPushToken(profile.id);
             return switch (profile.role) {
               AppRole.technician => TechnicianShellPage(
                 profile: profile,
@@ -120,6 +124,12 @@ class _AuthGateState extends State<AuthGate> {
         );
       },
     );
+  }
+
+  void _syncPushToken(String userId) {
+    if (_pushRegisteredUserId == userId) return;
+    _pushRegisteredUserId = userId;
+    PushNotificationService.instance.syncToken(userId);
   }
 }
 
