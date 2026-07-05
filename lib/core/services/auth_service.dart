@@ -23,6 +23,44 @@ class AuthService {
     return _client.auth.signInWithPassword(email: email, password: password);
   }
 
+  Future<AuthResponse> verifySignupOtp({
+    required String email,
+    required String token,
+  }) {
+    return _client.auth.verifyOTP(
+      email: email,
+      token: token,
+      type: OtpType.signup,
+    );
+  }
+
+  Future<void> resendSignupOtp({required String email}) async {
+    await _client.auth.resend(email: email, type: OtpType.signup);
+  }
+
+  Future<void> sendPasswordResetEmail({required String email}) {
+    return _client.auth.resetPasswordForEmail(
+      email,
+      redirectTo: 'siteknisi://reset-password',
+    );
+  }
+
+  Future<bool?> isEmailRegistered({required String email}) async {
+    try {
+      final result = await _client.rpc<bool>(
+        'email_exists',
+        params: {'lookup_email': email.trim()},
+      );
+      return result;
+    } catch (_) {
+      return null;
+    }
+  }
+
+  Future<void> updatePassword({required String password}) async {
+    await _client.auth.updateUser(UserAttributes(password: password));
+  }
+
   Future<AuthResponse> registerCustomer({
     required String email,
     required String password,

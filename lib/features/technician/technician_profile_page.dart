@@ -48,6 +48,11 @@ class _TechnicianProfilePageState extends State<TechnicianProfilePage> {
     _future = _load();
   });
 
+  Future<void> _confirmSignOut() async {
+    if (!await AppFeedback.confirmLogout(context)) return;
+    await widget.authService.signOut();
+  }
+
   Future<void> _pickDocument({
     required TechnicianSummary technician,
     required String documentType,
@@ -357,7 +362,7 @@ class _TechnicianProfilePageState extends State<TechnicianProfilePage> {
                   ),
                   const SizedBox(height: 8),
                   OutlinedButton.icon(
-                    onPressed: widget.authService.signOut,
+                    onPressed: _confirmSignOut,
                     icon: const Icon(Icons.logout_rounded),
                     label: const Text('Keluar'),
                     style: OutlinedButton.styleFrom(

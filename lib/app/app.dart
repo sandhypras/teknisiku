@@ -8,10 +8,12 @@ import '../core/services/auth_service.dart';
 import '../features/auth/login_page.dart';
 import '../features/auth/register_customer_page.dart';
 import '../features/auth/register_technician_page.dart';
+import '../features/auth/reset_password_page.dart';
 import '../features/admin/admin_shell.dart';
 import '../features/customer/customer_shell_page.dart';
 import '../features/onboarding/onboarding_page.dart';
 import '../features/technician/technician_shell_page.dart';
+import '../shared/widgets/app_feedback.dart';
 import 'theme.dart';
 
 class SiTeknisiApp extends StatelessWidget {
@@ -56,6 +58,7 @@ class _AuthGateState extends State<AuthGate> {
   late Future<AppProfile?> _profileFuture = widget.authService.currentProfile();
   String? _profileUserId;
   var _showLoginMenu = false;
+  var _recoveringPassword = false;
 
   void _reloadProfile() {
     setState(() {
@@ -69,7 +72,18 @@ class _AuthGateState extends State<AuthGate> {
     return StreamBuilder<AuthState>(
       stream: widget.authService.authChanges,
       builder: (context, snapshot) {
+        if (snapshot.data?.event == AuthChangeEvent.passwordRecovery) {
+          _recoveringPassword = true;
+        }
         final session = widget.authService.currentSession;
+        if (_recoveringPassword && session != null) {
+          return ResetPasswordPage(
+            onComplete: () async {
+              await widget.authService.signOut();
+              if (mounted) setState(() => _recoveringPassword = false);
+            },
+          );
+        }
         if (session == null) {
           _profileUserId = null;
           if (!_showLoginMenu) {
@@ -180,7 +194,10 @@ class _InactiveAccountPage extends StatelessWidget {
     return Scaffold(
       body: Center(
         child: FilledButton.icon(
-          onPressed: authService.signOut,
+          onPressed: () async {
+            if (!await AppFeedback.confirmLogout(context)) return;
+            await authService.signOut();
+          },
           icon: const Icon(Icons.logout_rounded),
           label: const Text('Akun nonaktif, keluar'),
         ),

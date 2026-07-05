@@ -22,8 +22,7 @@ class _LoginPageState extends State<LoginPage> {
   late final AuthService _authService;
   bool _obscurePassword = true;
   bool _loading = false;
-  String? _error;
-  int _errorSerial = 0;
+  bool _sendingReset = false;
   _LoginRole _selectedRole = _LoginRole.customer;
 
   @override
@@ -44,22 +43,143 @@ class _LoginPageState extends State<LoginPage> {
     if (!_formKey.currentState!.validate()) return;
     setState(() {
       _loading = true;
-      _error = null;
     });
     try {
+      final email = _emailController.text.trim();
+      final registered = await _authService.isEmailRegistered(email: email);
+      if (registered == false) {
+        if (mounted) setState(() => _loading = false);
+        if (mounted) await _showEmailNotRegisteredDialog();
+        return;
+      }
       await _authService.signIn(
-        email: _emailController.text.trim(),
+        email: email,
         password: _passwordController.text,
       );
       if (mounted) Navigator.of(context).popUntil((route) => route.isFirst);
     } catch (error) {
-      setState(() {
-        _error = _loginErrorMessage(error);
-        _errorSerial += 1;
-      });
+      if (_isInvalidCredentials(error)) {
+        if (mounted) setState(() => _loading = false);
+        if (mounted) await _showWrongPasswordDialog();
+      } else {
+        if (mounted) setState(() => _loading = false);
+        if (mounted) await _showLoginErrorDialog(_loginErrorMessage(error));
+      }
     } finally {
       if (mounted) setState(() => _loading = false);
     }
+  }
+
+  bool _isInvalidCredentials(Object error) {
+    if (error is! AuthException) return false;
+    final message = error.message.toLowerCase();
+    return message.contains('invalid login credentials') ||
+        message.contains('invalid credentials');
+  }
+
+  Future<void> _showWrongPasswordDialog() async {
+    await showDialog<void>(
+      context: context,
+      barrierDismissible: true,
+      builder: (context) => AppFeedbackDialog(
+        compact: true,
+        title: const Text('Kata Sandi Salah', textAlign: TextAlign.center),
+        content: const Text(
+          'Kami bisa membantu login ke akun Anda jika lupa kata sandi.',
+          textAlign: TextAlign.center,
+        ),
+        actions: [
+          _LoginDialogAction(
+            label: 'Lupa kata sandi',
+            onPressed: () {
+              Navigator.pop(context);
+              _sendPasswordReset();
+            },
+          ),
+          _LoginDialogAction(
+            label: 'Coba lagi',
+            onPressed: () {
+              Navigator.pop(context);
+              _retryPassword();
+            },
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _showEmailNotRegisteredDialog() async {
+    await showDialog<void>(
+      context: context,
+      barrierDismissible: true,
+      builder: (context) => AppFeedbackDialog(
+        compact: true,
+        title: const Text('Email Tidak Terdaftar', textAlign: TextAlign.center),
+        content: const Text(
+          'Email ini belum terdaftar di database Si Teknisi. Periksa email atau buat akun baru.',
+          textAlign: TextAlign.center,
+        ),
+        actions: [
+          _LoginDialogAction(
+            label: 'Daftar akun',
+            onPressed: () {
+              Navigator.pop(context);
+              _openRegister();
+            },
+          ),
+          _LoginDialogAction(
+            label: 'Coba lagi',
+            onPressed: () {
+              Navigator.pop(context);
+              _emailController.clear();
+              _passwordController.clear();
+            },
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _showLoginErrorDialog(String message) async {
+    await showDialog<void>(
+      context: context,
+      barrierDismissible: true,
+      builder: (context) => AppFeedbackDialog(
+        compact: true,
+        title: const Text('Login Belum Berhasil', textAlign: TextAlign.center),
+        content: Text(message, textAlign: TextAlign.center),
+        actions: [
+          _LoginDialogAction(
+            label: 'Coba lagi',
+            onPressed: () {
+              Navigator.pop(context);
+              _retryPassword();
+            },
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _showPasswordResetSentDialog() async {
+    await showDialog<void>(
+      context: context,
+      barrierDismissible: true,
+      builder: (context) => AppFeedbackDialog(
+        compact: true,
+        title: const Text('Email Reset Terkirim', textAlign: TextAlign.center),
+        content: const Text(
+          'Link reset password sudah dikirim. Cek inbox atau folder spam email Anda.',
+          textAlign: TextAlign.center,
+        ),
+        actions: [
+          _LoginDialogAction(
+            label: 'Mengerti',
+            onPressed: () => Navigator.pop(context),
+          ),
+        ],
+      ),
+    );
   }
 
   String _loginErrorMessage(Object error) {
@@ -79,13 +199,8 @@ class _LoginPageState extends State<LoginPage> {
   void _retryPassword() {
     setState(() {
       _passwordController.clear();
-      _error = null;
     });
     _passwordFocusNode.requestFocus();
-  }
-
-  void _dismissError() {
-    setState(() => _error = null);
   }
 
   void _openRegister() {
@@ -95,6 +210,37 @@ class _LoginPageState extends State<LoginPage> {
           ? AppRoutes.registerCustomer
           : AppRoutes.registerTechnician,
     );
+  }
+
+  Future<void> _sendPasswordReset() async {
+    final email = _emailController.text.trim();
+    if (email.isEmpty || !email.contains('@')) {
+      await _showLoginErrorDialog(
+        'Masukkan email akun terlebih dahulu, lalu tekan Lupa Password lagi.',
+      );
+      return;
+    }
+    setState(() {
+      _sendingReset = true;
+    });
+    try {
+      final registered = await _authService.isEmailRegistered(email: email);
+      if (registered == false) {
+        if (mounted) setState(() => _sendingReset = false);
+        if (mounted) await _showEmailNotRegisteredDialog();
+        return;
+      }
+      await _authService.sendPasswordResetEmail(email: email);
+      if (!mounted) return;
+      await _showPasswordResetSentDialog();
+    } catch (error) {
+      if (!mounted) return;
+      await _showLoginErrorDialog(
+        'Email reset belum bisa dikirim. Coba beberapa saat lagi.',
+      );
+    } finally {
+      if (mounted) setState(() => _sendingReset = false);
+    }
   }
 
   @override
@@ -196,9 +342,6 @@ class _LoginPageState extends State<LoginPage> {
                           return null;
                         },
                         onSubmitted: (_) => _submit(),
-                        onChanged: (_) {
-                          if (_error != null) setState(() => _error = null);
-                        },
                       ),
                     ],
                   ),
@@ -207,7 +350,7 @@ class _LoginPageState extends State<LoginPage> {
                 Align(
                   alignment: Alignment.centerRight,
                   child: TextButton(
-                    onPressed: () {},
+                    onPressed: _sendingReset ? null : _sendPasswordReset,
                     child: const Text(
                       'Lupa Password?',
                       style: TextStyle(
@@ -217,20 +360,7 @@ class _LoginPageState extends State<LoginPage> {
                     ),
                   ),
                 ),
-                if (_error != null) ...[
-                  const SizedBox(height: 4),
-                  AppFeedbackBanner(
-                    key: ValueKey(_errorSerial),
-                    type: AppFeedbackType.error,
-                    title: 'Password belum sesuai',
-                    message: _error!,
-                    actionLabel: 'Coba lagi',
-                    onAction: _retryPassword,
-                    onDismiss: _dismissError,
-                  ),
-                  const SizedBox(height: 14),
-                ] else
-                  const SizedBox(height: 14),
+                const SizedBox(height: 14),
                 SizedBox(
                   height: 58,
                   child: FilledButton(
@@ -309,6 +439,29 @@ class _LoginPageState extends State<LoginPage> {
             ),
           ],
         ),
+      ),
+    );
+  }
+}
+
+class _LoginDialogAction extends StatelessWidget {
+  const _LoginDialogAction({required this.label, required this.onPressed});
+
+  final String label;
+  final VoidCallback onPressed;
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      width: double.infinity,
+      height: 48,
+      child: TextButton(
+        onPressed: onPressed,
+        style: TextButton.styleFrom(
+          foregroundColor: const Color(0xFF0876ED),
+          shape: const RoundedRectangleBorder(borderRadius: BorderRadius.zero),
+        ),
+        child: Text(label, style: const TextStyle(fontWeight: FontWeight.w800)),
       ),
     );
   }
@@ -435,7 +588,6 @@ class _AuthTextField extends StatelessWidget {
     this.suffix,
     this.validator,
     this.onSubmitted,
-    this.onChanged,
   });
 
   final TextEditingController controller;
@@ -447,7 +599,6 @@ class _AuthTextField extends StatelessWidget {
   final Widget? suffix;
   final String? Function(String?)? validator;
   final ValueChanged<String>? onSubmitted;
-  final ValueChanged<String>? onChanged;
 
   @override
   Widget build(BuildContext context) {
@@ -460,7 +611,6 @@ class _AuthTextField extends StatelessWidget {
         obscureText: obscureText,
         validator: validator,
         onFieldSubmitted: onSubmitted,
-        onChanged: onChanged,
         style: const TextStyle(
           color: Color(0xFF07143D),
           fontSize: 17,

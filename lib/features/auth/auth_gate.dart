@@ -3,6 +3,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../core/models/app_user_profile.dart';
 import '../../core/services/auth_service.dart';
+import '../../shared/widgets/app_feedback.dart';
 import '../home/role_home_screen.dart';
 import 'login_screen.dart';
 
@@ -115,7 +116,10 @@ class _InactiveAccountScreen extends StatelessWidget {
       appBar: AppBar(title: const Text('Akun nonaktif')),
       body: Center(
         child: FilledButton(
-          onPressed: authService.signOut,
+          onPressed: () async {
+            if (!await AppFeedback.confirmLogout(context)) return;
+            await authService.signOut();
+          },
           child: const Text('Keluar'),
         ),
       ),

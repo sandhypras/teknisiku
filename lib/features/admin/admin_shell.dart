@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../core/models/app_user_profile.dart';
 import '../../core/services/auth_service.dart';
+import '../../shared/widgets/app_feedback.dart';
 import 'admin_commission_screen.dart';
 import 'admin_payments_screen.dart';
 import 'admin_reports_screen.dart';
@@ -116,6 +117,11 @@ class _AdminShellState extends State<AdminShell> {
     const AdminSettingsScreen(),
   ];
 
+  Future<void> _confirmSignOut() async {
+    if (!await AppFeedback.confirmLogout(context)) return;
+    await widget.authService.signOut();
+  }
+
   @override
   Widget build(BuildContext context) {
     final width = MediaQuery.sizeOf(context).width;
@@ -128,7 +134,7 @@ class _AdminShellState extends State<AdminShell> {
         selectedIndex: _selectedIndex,
         profile: widget.profile,
         onSelect: (i) => setState(() => _selectedIndex = i),
-        onSignOut: widget.authService.signOut,
+        onSignOut: _confirmSignOut,
       );
     }
 
@@ -142,7 +148,7 @@ class _AdminShellState extends State<AdminShell> {
             profile: widget.profile,
             collapsed: _sidebarCollapsed,
             onSelect: (i) => setState(() => _selectedIndex = i),
-            onSignOut: widget.authService.signOut,
+            onSignOut: _confirmSignOut,
             onToggleCollapse: () =>
                 setState(() => _sidebarCollapsed = !_sidebarCollapsed),
           ),
@@ -154,7 +160,7 @@ class _AdminShellState extends State<AdminShell> {
                   profile: widget.profile,
                   onToggleSidebar: () =>
                       setState(() => _sidebarCollapsed = !_sidebarCollapsed),
-                  onSignOut: widget.authService.signOut,
+                  onSignOut: _confirmSignOut,
                 ),
                 Expanded(child: _screens[_selectedIndex]),
               ],

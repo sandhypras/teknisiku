@@ -4,6 +4,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../app/theme.dart';
 import '../../core/services/auth_service.dart';
+import 'verify_email_otp_page.dart';
 
 class RegisterCustomerPage extends StatefulWidget {
   const RegisterCustomerPage({super.key});
@@ -70,9 +71,24 @@ class _RegisterCustomerPageState extends State<RegisterCustomerPage> {
       final userId =
           response.user?.id ?? Supabase.instance.client.auth.currentUser?.id;
       if (userId == null) throw StateError('User gagal dibuat');
-      final imagePath = await _uploadProfilePhoto(userId, _profilePhoto!);
-      await _saveProfileImage(userId, imagePath);
-      if (mounted) Navigator.of(context).popUntil((route) => route.isFirst);
+      if (!mounted) return;
+      await Navigator.of(context).push(
+        MaterialPageRoute<void>(
+          builder: (_) => VerifyEmailOtpPage(
+            email: _emailController.text.trim(),
+            roleLabel: 'customer',
+            onVerified: () async {
+              final verifiedUserId =
+                  Supabase.instance.client.auth.currentUser?.id ?? userId;
+              final imagePath = await _uploadProfilePhoto(
+                verifiedUserId,
+                _profilePhoto!,
+              );
+              await _saveProfileImage(verifiedUserId, imagePath);
+            },
+          ),
+        ),
+      );
     } catch (error) {
       setState(() => _error = error.toString());
     } finally {
