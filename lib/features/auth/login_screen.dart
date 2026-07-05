@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../core/services/auth_service.dart';
+import '../../shared/widgets/app_feedback.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({required this.authService, super.key});
@@ -15,14 +17,15 @@ class _LoginScreenState extends State<LoginScreen> {
   final _formKey = GlobalKey<FormState>();
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
+  final _passwordFocusNode = FocusNode();
   bool _isLoading = false;
   bool _obscurePassword = true;
-  String? _errorMessage;
 
   @override
   void dispose() {
     _emailController.dispose();
     _passwordController.dispose();
+    _passwordFocusNode.dispose();
     super.dispose();
   }
 
@@ -33,7 +36,6 @@ class _LoginScreenState extends State<LoginScreen> {
 
     setState(() {
       _isLoading = true;
-      _errorMessage = null;
     });
 
     try {
@@ -42,9 +44,8 @@ class _LoginScreenState extends State<LoginScreen> {
         password: _passwordController.text,
       );
     } catch (error) {
-      setState(() {
-        _errorMessage = error.toString();
-      });
+      if (!mounted) return;
+      await _showLoginErrorDialog(error);
     } finally {
       if (mounted) {
         setState(() {
@@ -52,6 +53,48 @@ class _LoginScreenState extends State<LoginScreen> {
         });
       }
     }
+  }
+
+  Future<void> _showLoginErrorDialog(Object error) async {
+    final wrongPassword = _isInvalidCredentials(error);
+    await showDialog<void>(
+      context: context,
+      barrierDismissible: true,
+      builder: (context) => AppFeedbackDialog(
+        compact: true,
+        title: Text(
+          wrongPassword ? 'Kata Sandi Salah' : 'Login Belum Berhasil',
+          textAlign: TextAlign.center,
+        ),
+        content: Text(
+          wrongPassword
+              ? 'Password admin belum sesuai. Periksa kembali kata sandi lalu coba masuk lagi.'
+              : 'Pastikan email dan password admin sudah benar.',
+          textAlign: TextAlign.center,
+        ),
+        actions: [
+          _LoginDialogAction(
+            label: 'Coba lagi',
+            onPressed: () {
+              Navigator.pop(context);
+              _retryPassword();
+            },
+          ),
+        ],
+      ),
+    );
+  }
+
+  bool _isInvalidCredentials(Object error) {
+    if (error is! AuthException) return false;
+    final message = error.message.toLowerCase();
+    return message.contains('invalid login credentials') ||
+        message.contains('invalid credentials');
+  }
+
+  void _retryPassword() {
+    _passwordController.clear();
+    _passwordFocusNode.requestFocus();
   }
 
   @override
@@ -108,7 +151,6 @@ class _LoginScreenState extends State<LoginScreen> {
   }
 
   Widget _buildForm() {
-    final errorColor = Theme.of(context).colorScheme.error;
     return Form(
       key: _formKey,
       child: Column(
@@ -150,6 +192,7 @@ class _LoginScreenState extends State<LoginScreen> {
           const SizedBox(height: 14),
           TextFormField(
             controller: _passwordController,
+            focusNode: _passwordFocusNode,
             obscureText: _obscurePassword,
             decoration: _inputDecoration(
               label: 'Password',
@@ -174,34 +217,6 @@ class _LoginScreenState extends State<LoginScreen> {
               return null;
             },
           ),
-          if (_errorMessage != null) ...[
-            const SizedBox(height: 14),
-            Container(
-              padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(
-                color: errorColor.withValues(alpha: 0.08),
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: errorColor.withValues(alpha: 0.18)),
-              ),
-              child: Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Icon(
-                    Icons.error_outline_rounded,
-                    color: errorColor,
-                    size: 18,
-                  ),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: Text(
-                      _errorMessage!,
-                      style: TextStyle(color: errorColor, fontSize: 12),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ],
           const SizedBox(height: 22),
           SizedBox(
             height: 52,
@@ -256,6 +271,29 @@ class _LoginScreenState extends State<LoginScreen> {
         borderSide: const BorderSide(color: Color(0xFF0D72BD), width: 1.5),
       ),
       contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+    );
+  }
+}
+
+class _LoginDialogAction extends StatelessWidget {
+  const _LoginDialogAction({required this.label, required this.onPressed});
+
+  final String label;
+  final VoidCallback onPressed;
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      width: double.infinity,
+      height: 48,
+      child: TextButton(
+        onPressed: onPressed,
+        style: TextButton.styleFrom(
+          foregroundColor: const Color(0xFF0876ED),
+          shape: const RoundedRectangleBorder(borderRadius: BorderRadius.zero),
+        ),
+        child: Text(label, style: const TextStyle(fontWeight: FontWeight.w800)),
+      ),
     );
   }
 }
