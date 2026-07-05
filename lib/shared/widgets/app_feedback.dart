@@ -8,6 +8,33 @@ enum AppFeedbackType { success, error, warning, info }
 class AppFeedback {
   const AppFeedback._();
 
+  static Future<bool> confirmLogout(BuildContext context) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      barrierDismissible: true,
+      builder: (context) => AppFeedbackDialog(
+        compact: true,
+        title: const Text('Keluar dari akun?', textAlign: TextAlign.center),
+        content: const Text(
+          'Anda akan keluar dari Si Teknisi dan perlu login kembali untuk menggunakan layanan.',
+          textAlign: TextAlign.center,
+        ),
+        actions: [
+          _DialogTextAction(
+            label: 'Batal',
+            onPressed: () => Navigator.pop(context, false),
+          ),
+          _DialogTextAction(
+            label: 'Keluar',
+            isDestructive: true,
+            onPressed: () => Navigator.pop(context, true),
+          ),
+        ],
+      ),
+    );
+    return confirmed ?? false;
+  }
+
   static void success(
     BuildContext context, {
     String title = 'Berhasil',
@@ -250,11 +277,18 @@ class AppFeedbackBanner extends StatelessWidget {
 }
 
 class AppFeedbackDialog extends StatelessWidget {
-  const AppFeedbackDialog({super.key, this.title, this.content, this.actions});
+  const AppFeedbackDialog({
+    super.key,
+    this.title,
+    this.content,
+    this.actions,
+    this.compact = false,
+  });
 
   final Widget? title;
   final Widget? content;
   final List<Widget>? actions;
+  final bool compact;
 
   @override
   Widget build(BuildContext context) {
@@ -262,11 +296,11 @@ class AppFeedbackDialog extends StatelessWidget {
       insetPadding: const EdgeInsets.symmetric(horizontal: 22, vertical: 24),
       backgroundColor: Colors.transparent,
       child: ConstrainedBox(
-        constraints: const BoxConstraints(maxWidth: 640),
+        constraints: BoxConstraints(maxWidth: compact ? 320 : 640),
         child: Container(
           decoration: BoxDecoration(
             color: Colors.white,
-            borderRadius: BorderRadius.circular(24),
+            borderRadius: BorderRadius.circular(compact ? 10 : 24),
             border: Border.all(color: const Color(0xFFE7EEF7)),
             boxShadow: [
               BoxShadow(
@@ -283,11 +317,11 @@ class AppFeedbackDialog extends StatelessWidget {
             children: [
               if (title != null)
                 Padding(
-                  padding: const EdgeInsets.fromLTRB(22, 20, 22, 10),
+                  padding: EdgeInsets.fromLTRB(22, compact ? 18 : 20, 22, 10),
                   child: DefaultTextStyle(
-                    style: const TextStyle(
+                    style: TextStyle(
                       color: Color(0xFF07143D),
-                      fontSize: 20,
+                      fontSize: compact ? 15 : 20,
                       fontWeight: FontWeight.w900,
                       letterSpacing: 0,
                     ),
@@ -315,21 +349,71 @@ class AppFeedbackDialog extends StatelessWidget {
                 ),
               if (actions != null && actions!.isNotEmpty)
                 Container(
-                  padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
+                  padding: compact
+                      ? EdgeInsets.zero
+                      : const EdgeInsets.fromLTRB(16, 12, 16, 16),
                   decoration: const BoxDecoration(
                     color: Color(0xFFF7FAFE),
                     border: Border(top: BorderSide(color: Color(0xFFE7EEF7))),
                   ),
-                  child: Wrap(
-                    alignment: WrapAlignment.end,
-                    spacing: 10,
-                    runSpacing: 10,
-                    children: actions!,
-                  ),
+                  child: compact
+                      ? Column(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            for (
+                              var index = 0;
+                              index < actions!.length;
+                              index++
+                            ) ...[
+                              if (index > 0)
+                                const Divider(
+                                  height: 1,
+                                  color: Color(0xFFE7EEF7),
+                                ),
+                              actions![index],
+                            ],
+                          ],
+                        )
+                      : Wrap(
+                          alignment: WrapAlignment.end,
+                          spacing: 10,
+                          runSpacing: 10,
+                          children: actions!,
+                        ),
                 ),
             ],
           ),
         ),
+      ),
+    );
+  }
+}
+
+class _DialogTextAction extends StatelessWidget {
+  const _DialogTextAction({
+    required this.label,
+    required this.onPressed,
+    this.isDestructive = false,
+  });
+
+  final String label;
+  final VoidCallback onPressed;
+  final bool isDestructive;
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      width: double.infinity,
+      height: 48,
+      child: TextButton(
+        onPressed: onPressed,
+        style: TextButton.styleFrom(
+          foregroundColor: isDestructive
+              ? const Color(0xFFE5484D)
+              : const Color(0xFF0876ED),
+          shape: const RoundedRectangleBorder(borderRadius: BorderRadius.zero),
+        ),
+        child: Text(label, style: const TextStyle(fontWeight: FontWeight.w800)),
       ),
     );
   }

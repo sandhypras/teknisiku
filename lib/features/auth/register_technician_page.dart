@@ -5,6 +5,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../app/theme.dart';
 import '../../core/services/auth_service.dart';
 import '../../core/services/marketplace_repository.dart';
+import 'verify_email_otp_page.dart';
 
 class RegisterTechnicianPage extends StatefulWidget {
   const RegisterTechnicianPage({super.key});
@@ -79,16 +80,31 @@ class _RegisterTechnicianPageState extends State<RegisterTechnicianPage> {
       final userId =
           response.user?.id ?? Supabase.instance.client.auth.currentUser?.id;
       if (userId == null) throw StateError('User teknisi gagal dibuat');
-      final imagePath = await _uploadProfilePhoto(userId, _profilePhoto!);
-      await _saveProfileImage(userId, imagePath);
-      await _repo.upsertTechnicianProfile(
-        address: '-',
-        experience: _experience.text.trim(),
-        skills: _skills.text.trim(),
-        serviceArea: 'Solo',
-        description: _description.text.trim(),
+      if (!mounted) return;
+      await Navigator.of(context).push(
+        MaterialPageRoute<void>(
+          builder: (_) => VerifyEmailOtpPage(
+            email: _email.text.trim(),
+            roleLabel: 'teknisi',
+            onVerified: () async {
+              final verifiedUserId =
+                  Supabase.instance.client.auth.currentUser?.id ?? userId;
+              final imagePath = await _uploadProfilePhoto(
+                verifiedUserId,
+                _profilePhoto!,
+              );
+              await _saveProfileImage(verifiedUserId, imagePath);
+              await _repo.upsertTechnicianProfile(
+                address: '-',
+                experience: _experience.text.trim(),
+                skills: _skills.text.trim(),
+                serviceArea: 'Solo',
+                description: _description.text.trim(),
+              );
+            },
+          ),
+        ),
       );
-      if (mounted) Navigator.of(context).popUntil((route) => route.isFirst);
     } catch (error) {
       setState(() => _error = error.toString());
     } finally {
