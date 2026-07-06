@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../core/config/app_config.dart';
@@ -61,6 +62,31 @@ class _AuthGateState extends State<AuthGate> {
   String? _pushRegisteredUserId;
   var _showLoginMenu = false;
   var _recoveringPassword = false;
+  bool? _onboardingDone;
+
+  static const _kOnboardingKey = 'onboarding_done';
+
+  @override
+  void initState() {
+    super.initState();
+    _loadOnboardingFlag();
+  }
+
+  Future<void> _loadOnboardingFlag() async {
+    final prefs = await SharedPreferences.getInstance();
+    setState(() {
+      _onboardingDone = prefs.getBool(_kOnboardingKey) ?? false;
+    });
+  }
+
+  Future<void> _completeOnboarding() async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool(_kOnboardingKey, true);
+    setState(() {
+      _onboardingDone = true;
+      _showLoginMenu = true;
+    });
+  }
 
   void _reloadProfile() {
     setState(() {
@@ -89,10 +115,11 @@ class _AuthGateState extends State<AuthGate> {
         if (session == null) {
           _profileUserId = null;
           _pushRegisteredUserId = null;
-          if (!_showLoginMenu) {
-            return OnboardingPage(
-              onContinue: () => setState(() => _showLoginMenu = true),
-            );
+          if (_onboardingDone == null) {
+            return const _SplashLoadingPage();
+          }
+          if (!_onboardingDone! && !_showLoginMenu) {
+            return OnboardingPage(onContinue: _completeOnboarding);
           }
           return const LoginMenuPage();
         }
