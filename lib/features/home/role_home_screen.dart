@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../core/models/app_user_profile.dart';
 import '../../core/services/auth_service.dart';
+import '../../shared/widgets/app_feedback.dart';
 import '../admin/admin_shell.dart';
 
 class RoleHomeScreen extends StatelessWidget {
@@ -32,7 +33,10 @@ class RoleHomeScreen extends StatelessWidget {
         actions: [
           IconButton(
             tooltip: 'Keluar',
-            onPressed: authService.signOut,
+            onPressed: () async {
+              if (!await AppFeedback.confirmLogout(context)) return;
+              await authService.signOut();
+            },
             icon: const Icon(Icons.logout),
           ),
         ],

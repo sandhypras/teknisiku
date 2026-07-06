@@ -36,6 +36,9 @@ Future<void> main() async {
       // `publishableKey` ditujukan untuk key format baru `sb_publishable_*`.
       // ignore: deprecated_member_use
       anonKey: AppConfig.supabaseAnonKey,
+      authOptions: const FlutterAuthClientOptions(
+        authFlowType: AuthFlowType.pkce,
+      ),
     );
   }
 

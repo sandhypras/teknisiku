@@ -40,6 +40,9 @@ migrate_working_dir/
 .supabase-fcm.env
 firebase-service-account.json
 *-firebase-adminsdk-*.json
+android/key.properties
+*.jks
+*.keystore
 
 # Codex local workspace
 work/

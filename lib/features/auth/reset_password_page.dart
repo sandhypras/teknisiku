@@ -3,6 +3,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../app/theme.dart';
 import '../../core/services/auth_service.dart';
+import '../../shared/widgets/app_feedback.dart';
 
 class ResetPasswordPage extends StatefulWidget {
   const ResetPasswordPage({required this.onComplete, super.key});
@@ -44,11 +45,14 @@ class _ResetPasswordPageState extends State<ResetPasswordPage> {
     });
     try {
       await _authService.updatePassword(password: _password.text);
-      await widget.onComplete();
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Password baru berhasil disimpan.')),
+      AppFeedback.success(
+        context,
+        title: 'Password Disimpan',
+        message: 'Password baru berhasil disimpan. Silakan login kembali.',
       );
+      await Future<void>.delayed(const Duration(milliseconds: 900));
+      await widget.onComplete();
     } catch (error) {
       setState(
         () => _error =

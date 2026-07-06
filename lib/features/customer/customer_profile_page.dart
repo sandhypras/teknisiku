@@ -6,6 +6,7 @@ import '../../core/models/mobile_models.dart';
 import '../../core/services/auth_service.dart';
 import '../../core/services/marketplace_repository.dart';
 import '../../shared/mobile_ui.dart';
+import '../../shared/widgets/app_feedback.dart';
 import 'customer_shell_page.dart';
 
 class CustomerProfilePage extends StatefulWidget {
@@ -48,6 +49,11 @@ class _CustomerProfilePageState extends State<CustomerProfilePage> {
     _future = _load();
   });
 
+  Future<void> _confirmSignOut() async {
+    if (!await AppFeedback.confirmLogout(context)) return;
+    await widget.authService.signOut();
+  }
+
   @override
   Widget build(BuildContext context) {
     return Container(
@@ -80,7 +86,7 @@ class _CustomerProfilePageState extends State<CustomerProfilePage> {
                       children: [
                         _ProfileCard(
                           profile: widget.profile,
-                          onSignOut: widget.authService.signOut,
+                          onSignOut: _confirmSignOut,
                         ),
                         const SizedBox(height: 16),
                         if (snapshot.connectionState == ConnectionState.waiting)
