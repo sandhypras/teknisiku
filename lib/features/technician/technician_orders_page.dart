@@ -1,9 +1,12 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import 'package:image_picker/image_picker.dart';
 
 import '../../app/theme.dart';
 import '../../core/models/mobile_models.dart';
 import '../../core/services/marketplace_repository.dart';
 import '../../shared/mobile_ui.dart';
+import '../../shared/widgets/app_feedback.dart';
 
 class TechnicianOrdersPage extends StatefulWidget {
   const TechnicianOrdersPage({required this.repo, super.key});
@@ -16,6 +19,7 @@ class TechnicianOrdersPage extends StatefulWidget {
 
 class _TechnicianOrdersPageState extends State<TechnicianOrdersPage> {
   late Future<_TechnicianOrdersData> _future;
+  final _picker = ImagePicker();
   int _tab = 0;
 
   @override
@@ -97,10 +101,14 @@ class _TechnicianOrdersPageState extends State<TechnicianOrdersPage> {
                       _OrderCard(
                         order: order,
                         onStatus: (status) async {
-                          await widget.repo.updateOrderStatus(order.id, status);
-                          _refresh();
+                          await _updateOrderStatus(order, status);
                         },
                         onDetail: () => _showOrderDetail(order),
+                        onDiagnosis: () => _showDiagnosisSheet(order),
+                        onUploadBefore: () =>
+                            _showPhotoSource(order, 'Foto sebelum pengerjaan'),
+                        onUploadAfter: () =>
+                            _showPhotoSource(order, 'Foto sesudah pengerjaan'),
                       ),
                       const SizedBox(height: 14),
                     ],
@@ -111,6 +119,30 @@ class _TechnicianOrdersPageState extends State<TechnicianOrdersPage> {
         ),
       ),
     );
+  }
+
+  Future<void> _updateOrderStatus(OrderSummary order, String status) async {
+    try {
+      if (status == 'completed') {
+        await widget.repo.completeOrderWithDocuments(order.id);
+      } else {
+        await widget.repo.updateOrderStatus(order.id, status);
+      }
+      if (!mounted) return;
+      AppFeedback.success(
+        context,
+        title: 'Status diperbarui',
+        message: 'Order berubah ke ${orderStatusLabel(status)}.',
+      );
+      _refresh();
+    } catch (error) {
+      if (!mounted) return;
+      AppFeedback.error(
+        context,
+        title: 'Gagal memperbarui order',
+        message: friendlyErrorMessage(error),
+      );
+    }
   }
 
   String get _emptyMessage => switch (_tab) {
@@ -149,64 +181,301 @@ class _TechnicianOrdersPageState extends State<TechnicianOrdersPage> {
     final total = order.finalTotal > 0
         ? order.finalTotal
         : order.estimatedTotal;
+    final addressText = [
+      order.address,
+      order.city,
+    ].where((item) => (item ?? '').trim().isNotEmpty).join(', ');
     showModalBottomSheet(
       context: context,
       showDragHandle: true,
       isScrollControlled: true,
       builder: (context) => SafeArea(
+        child: SingleChildScrollView(
+          padding: EdgeInsets.only(
+            bottom: MediaQuery.viewInsetsOf(context).bottom,
+          ),
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(20, 0, 20, 22),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  order.orderNumber,
+                  style: const TextStyle(
+                    color: AppColors.textPrimary,
+                    fontSize: 22,
+                    fontWeight: FontWeight.w900,
+                  ),
+                ),
+                const SizedBox(height: 14),
+                _DetailLine('Customer', order.customerName),
+                _CopyableDetailLine('Telepon', order.customerPhone ?? '-'),
+                _DetailLine('Status', orderStatusLabel(order.status)),
+                _DetailLine(
+                  'Jadwal',
+                  '${order.scheduleDate} ${order.scheduleTime}',
+                ),
+                _DetailLine(
+                  'Alamat',
+                  addressText.isEmpty
+                      ? 'Alamat belum tersedia di data pesanan'
+                      : addressText,
+                ),
+                if (order.serviceFee > 0)
+                  _DetailLine('Biaya layanan', formatRupiah(order.serviceFee)),
+                _DetailLine('Estimasi', formatRupiah(total)),
+                const Divider(height: 26),
+                const Text(
+                  'Deskripsi Masalah',
+                  style: TextStyle(
+                    color: AppColors.textPrimary,
+                    fontWeight: FontWeight.w900,
+                  ),
+                ),
+                const SizedBox(height: 6),
+                Text(
+                  order.problemDescription.isEmpty
+                      ? 'Tidak ada deskripsi'
+                      : order.problemDescription,
+                  style: const TextStyle(
+                    color: AppColors.textSecondary,
+                    height: 1.4,
+                  ),
+                ),
+                const SizedBox(height: 18),
+                FutureBuilder<OrderWorkflowDetail>(
+                  future: widget.repo.orderWorkflowDetail(order.id),
+                  builder: (context, snapshot) {
+                    if (snapshot.connectionState == ConnectionState.waiting) {
+                      return const Center(child: CircularProgressIndicator());
+                    }
+                    if (snapshot.hasError) {
+                      return Text(friendlyErrorMessage(snapshot.error));
+                    }
+                    return _WorkflowDetailPanel(detail: snapshot.data!);
+                  },
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  void _showDiagnosisSheet(OrderSummary order) {
+    final diagnosisCtrl = TextEditingController();
+    final estimationCtrl = TextEditingController();
+    final serviceCostCtrl = TextEditingController(
+      text: order.finalTotal > 0 ? order.finalTotal.toStringAsFixed(0) : '',
+    );
+    final parts = <_SparepartDraft>[_SparepartDraft()];
+    showModalBottomSheet(
+      context: context,
+      showDragHandle: true,
+      isScrollControlled: true,
+      builder: (context) => StatefulBuilder(
+        builder: (context, setSheetState) => SafeArea(
+          child: SingleChildScrollView(
+            padding: EdgeInsets.fromLTRB(
+              20,
+              0,
+              20,
+              MediaQuery.viewInsetsOf(context).bottom + 22,
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text(
+                  'Diagnosis & Estimasi Final',
+                  style: TextStyle(
+                    color: AppColors.textPrimary,
+                    fontSize: 22,
+                    fontWeight: FontWeight.w900,
+                  ),
+                ),
+                const SizedBox(height: 14),
+                TextField(
+                  controller: diagnosisCtrl,
+                  minLines: 3,
+                  maxLines: 5,
+                  decoration: const InputDecoration(
+                    labelText: 'Diagnosis kerusakan',
+                    border: OutlineInputBorder(),
+                  ),
+                ),
+                const SizedBox(height: 12),
+                TextField(
+                  controller: estimationCtrl,
+                  decoration: const InputDecoration(
+                    labelText: 'Estimasi pengerjaan',
+                    hintText: 'Contoh: 1-2 hari',
+                    border: OutlineInputBorder(),
+                  ),
+                ),
+                const SizedBox(height: 12),
+                TextField(
+                  controller: serviceCostCtrl,
+                  keyboardType: TextInputType.number,
+                  decoration: const InputDecoration(
+                    labelText: 'Biaya jasa final',
+                    prefixText: 'Rp ',
+                    border: OutlineInputBorder(),
+                  ),
+                ),
+                const SizedBox(height: 16),
+                Row(
+                  children: [
+                    const Expanded(
+                      child: Text(
+                        'Sparepart',
+                        style: TextStyle(fontWeight: FontWeight.w900),
+                      ),
+                    ),
+                    TextButton.icon(
+                      onPressed: () =>
+                          setSheetState(() => parts.add(_SparepartDraft())),
+                      icon: const Icon(Icons.add_rounded),
+                      label: const Text('Tambah'),
+                    ),
+                  ],
+                ),
+                for (final entry in parts.indexed) ...[
+                  _SparepartInputRow(
+                    draft: entry.$2,
+                    onRemove: parts.length == 1
+                        ? null
+                        : () => setSheetState(() => parts.removeAt(entry.$1)),
+                  ),
+                  const SizedBox(height: 10),
+                ],
+                const SizedBox(height: 12),
+                SizedBox(
+                  width: double.infinity,
+                  height: 52,
+                  child: FilledButton.icon(
+                    icon: const Icon(Icons.send_rounded),
+                    label: const Text('Kirim Estimasi ke Customer'),
+                    onPressed: () async {
+                      if (diagnosisCtrl.text.trim().isEmpty) {
+                        AppFeedback.warning(
+                          context,
+                          title: 'Diagnosis wajib diisi',
+                          message:
+                              'Tuliskan hasil pemeriksaan sebelum mengirim estimasi.',
+                        );
+                        return;
+                      }
+                      try {
+                        await widget.repo.submitOrderDiagnosis(
+                          orderId: order.id,
+                          diagnosisResult: diagnosisCtrl.text.trim(),
+                          workEstimation: estimationCtrl.text.trim(),
+                          serviceCost:
+                              double.tryParse(
+                                serviceCostCtrl.text.trim().replaceAll('.', ''),
+                              ) ??
+                              0,
+                          spareparts: parts
+                              .map((part) => part.toPayload())
+                              .where(
+                                (item) =>
+                                    '${item['name'] ?? ''}'.trim().isNotEmpty,
+                              )
+                              .toList(),
+                        );
+                        if (!mounted) return;
+                        if (context.mounted) Navigator.pop(context);
+                        AppFeedback.success(
+                          this.context,
+                          title: 'Estimasi dikirim',
+                          message:
+                              'Customer dapat menyetujui atau menolak biaya final.',
+                        );
+                        _refresh();
+                      } catch (error) {
+                        if (!context.mounted) return;
+                        AppFeedback.error(
+                          context,
+                          title: 'Gagal mengirim estimasi',
+                          message: friendlyErrorMessage(error),
+                        );
+                      }
+                    },
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  void _showPhotoSource(OrderSummary order, String caption) {
+    showModalBottomSheet(
+      context: context,
+      showDragHandle: true,
+      builder: (context) => SafeArea(
         child: Padding(
-          padding: const EdgeInsets.fromLTRB(20, 0, 20, 22),
+          padding: const EdgeInsets.fromLTRB(20, 0, 20, 18),
           child: Column(
             mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text(
-                order.orderNumber,
-                style: const TextStyle(
-                  color: AppColors.textPrimary,
-                  fontSize: 22,
-                  fontWeight: FontWeight.w900,
-                ),
+              ListTile(
+                leading: const Icon(Icons.photo_camera_rounded),
+                title: const Text('Ambil dari kamera'),
+                onTap: () {
+                  Navigator.pop(context);
+                  _uploadWorkPhoto(order, caption, ImageSource.camera);
+                },
               ),
-              const SizedBox(height: 14),
-              _DetailLine('Customer', order.customerName),
-              _DetailLine('Telepon', order.customerPhone ?? '-'),
-              _DetailLine('Status', orderStatusLabel(order.status)),
-              _DetailLine(
-                'Jadwal',
-                '${order.scheduleDate} ${order.scheduleTime}',
-              ),
-              _DetailLine(
-                'Alamat',
-                [
-                  order.address,
-                  order.city,
-                ].where((item) => (item ?? '').isNotEmpty).join(', '),
-              ),
-              _DetailLine('Estimasi', formatRupiah(total)),
-              const Divider(height: 26),
-              const Text(
-                'Deskripsi Masalah',
-                style: TextStyle(
-                  color: AppColors.textPrimary,
-                  fontWeight: FontWeight.w900,
-                ),
-              ),
-              const SizedBox(height: 6),
-              Text(
-                order.problemDescription.isEmpty
-                    ? 'Tidak ada deskripsi'
-                    : order.problemDescription,
-                style: const TextStyle(
-                  color: AppColors.textSecondary,
-                  height: 1.4,
-                ),
+              ListTile(
+                leading: const Icon(Icons.photo_library_rounded),
+                title: const Text('Pilih dari galeri'),
+                onTap: () {
+                  Navigator.pop(context);
+                  _uploadWorkPhoto(order, caption, ImageSource.gallery);
+                },
               ),
             ],
           ),
         ),
       ),
     );
+  }
+
+  Future<void> _uploadWorkPhoto(
+    OrderSummary order,
+    String caption,
+    ImageSource source,
+  ) async {
+    final file = await _picker.pickImage(
+      source: source,
+      imageQuality: 82,
+      maxWidth: 1600,
+    );
+    if (file == null) return;
+    try {
+      await widget.repo.uploadOrderAttachment(
+        orderId: order.id,
+        bytes: await file.readAsBytes(),
+        fileName: file.name,
+        contentType: file.mimeType,
+        caption: caption,
+      );
+      if (!mounted) return;
+      AppFeedback.success(context, title: 'Foto terupload', message: caption);
+    } catch (error) {
+      if (!mounted) return;
+      AppFeedback.error(
+        context,
+        title: 'Upload foto gagal',
+        message: friendlyErrorMessage(error),
+      );
+    }
   }
 }
 
@@ -305,11 +574,17 @@ class _OrderCard extends StatelessWidget {
     required this.order,
     required this.onStatus,
     required this.onDetail,
+    required this.onDiagnosis,
+    required this.onUploadBefore,
+    required this.onUploadAfter,
   });
 
   final OrderSummary order;
   final ValueChanged<String> onStatus;
   final VoidCallback onDetail;
+  final VoidCallback onDiagnosis;
+  final VoidCallback onUploadBefore;
+  final VoidCallback onUploadAfter;
 
   @override
   Widget build(BuildContext context) {
@@ -413,7 +688,13 @@ class _OrderCard extends StatelessWidget {
               TextButton(onPressed: onDetail, child: const Text('Detail')),
             ],
           ),
-          _ActionRow(order: order, onStatus: onStatus),
+          _ActionRow(
+            order: order,
+            onStatus: onStatus,
+            onDiagnosis: onDiagnosis,
+            onUploadBefore: onUploadBefore,
+            onUploadAfter: onUploadAfter,
+          ),
         ],
       ),
     );
@@ -421,10 +702,19 @@ class _OrderCard extends StatelessWidget {
 }
 
 class _ActionRow extends StatelessWidget {
-  const _ActionRow({required this.order, required this.onStatus});
+  const _ActionRow({
+    required this.order,
+    required this.onStatus,
+    required this.onDiagnosis,
+    required this.onUploadBefore,
+    required this.onUploadAfter,
+  });
 
   final OrderSummary order;
   final ValueChanged<String> onStatus;
+  final VoidCallback onDiagnosis;
+  final VoidCallback onUploadBefore;
+  final VoidCallback onUploadAfter;
 
   @override
   Widget build(BuildContext context) {
@@ -442,6 +732,79 @@ class _ActionRow extends StatelessWidget {
             child: FilledButton(
               onPressed: () => onStatus('accepted'),
               child: const Text('Terima'),
+            ),
+          ),
+        ],
+      );
+    }
+    if (order.status == 'inspection' ||
+        order.status == 'waiting_price_approval') {
+      return Column(
+        children: [
+          SizedBox(
+            width: double.infinity,
+            child: FilledButton.icon(
+              onPressed: onDiagnosis,
+              icon: const Icon(Icons.build_circle_rounded),
+              label: Text(
+                order.status == 'waiting_price_approval'
+                    ? 'Edit Diagnosis & Biaya'
+                    : 'Isi Diagnosis & Biaya',
+              ),
+            ),
+          ),
+          const SizedBox(height: 10),
+          Row(
+            children: [
+              Expanded(
+                child: OutlinedButton.icon(
+                  onPressed: onUploadBefore,
+                  icon: const Icon(Icons.photo_camera_rounded, size: 17),
+                  label: const Text('Foto Sebelum'),
+                ),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: OutlinedButton.icon(
+                  onPressed: onUploadAfter,
+                  icon: const Icon(Icons.photo_library_rounded, size: 17),
+                  label: const Text('Foto Sesudah'),
+                ),
+              ),
+            ],
+          ),
+        ],
+      );
+    }
+    if (order.status == 'in_progress') {
+      return Column(
+        children: [
+          Row(
+            children: [
+              Expanded(
+                child: OutlinedButton.icon(
+                  onPressed: onUploadBefore,
+                  icon: const Icon(Icons.photo_camera_rounded, size: 17),
+                  label: const Text('Foto Sebelum'),
+                ),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: OutlinedButton.icon(
+                  onPressed: onUploadAfter,
+                  icon: const Icon(Icons.photo_library_rounded, size: 17),
+                  label: const Text('Foto Sesudah'),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 10),
+          SizedBox(
+            width: double.infinity,
+            child: FilledButton.icon(
+              onPressed: () => onStatus('waiting_payment'),
+              icon: const Icon(Icons.payments_rounded),
+              label: const Text('Selesai, Minta Pembayaran'),
             ),
           ),
         ],
@@ -492,6 +855,182 @@ class _MetaLine extends StatelessWidget {
   }
 }
 
+class _WorkflowDetailPanel extends StatelessWidget {
+  const _WorkflowDetailPanel({required this.detail});
+
+  final OrderWorkflowDetail detail;
+
+  @override
+  Widget build(BuildContext context) {
+    final diagnosis = detail.diagnosis;
+    if (diagnosis == null &&
+        detail.spareparts.isEmpty &&
+        detail.attachments.isEmpty) {
+      return const Text(
+        'Diagnosis, sparepart, dan foto pekerjaan belum ditambahkan.',
+        style: TextStyle(color: AppColors.textSecondary),
+      );
+    }
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        if (diagnosis != null) ...[
+          const Text(
+            'Diagnosis',
+            style: TextStyle(
+              color: AppColors.textPrimary,
+              fontWeight: FontWeight.w900,
+            ),
+          ),
+          const SizedBox(height: 6),
+          Text(diagnosis.diagnosisResult),
+          if ((diagnosis.workEstimation ?? '').isNotEmpty)
+            Text('Estimasi: ${diagnosis.workEstimation}'),
+          Text('Biaya jasa: ${formatRupiah(diagnosis.serviceCost)}'),
+          Text('Biaya sparepart: ${formatRupiah(diagnosis.sparepartCost)}'),
+          Text(
+            'Total: ${formatRupiah(diagnosis.totalCost)}',
+            style: const TextStyle(fontWeight: FontWeight.w900),
+          ),
+          const Divider(height: 24),
+        ],
+        if (detail.spareparts.isNotEmpty) ...[
+          const Text(
+            'Sparepart',
+            style: TextStyle(fontWeight: FontWeight.w900),
+          ),
+          const SizedBox(height: 6),
+          for (final item in detail.spareparts)
+            Text(
+              '${item.name} x${item.quantity} - ${formatRupiah(item.total)}',
+            ),
+          const Divider(height: 24),
+        ],
+        if (detail.attachments.isNotEmpty) ...[
+          const Text(
+            'Foto Pekerjaan',
+            style: TextStyle(fontWeight: FontWeight.w900),
+          ),
+          const SizedBox(height: 8),
+          SizedBox(
+            height: 96,
+            child: ListView.separated(
+              scrollDirection: Axis.horizontal,
+              itemCount: detail.attachments.length,
+              separatorBuilder: (_, _) => const SizedBox(width: 10),
+              itemBuilder: (context, index) {
+                final attachment = detail.attachments[index];
+                return ClipRRect(
+                  borderRadius: BorderRadius.circular(14),
+                  child: Stack(
+                    children: [
+                      Image.network(
+                        attachment.fileUrl,
+                        width: 110,
+                        height: 96,
+                        fit: BoxFit.cover,
+                        errorBuilder: (_, _, _) => Container(
+                          width: 110,
+                          height: 96,
+                          color: const Color(0xFFEAF4FF),
+                          child: const Icon(Icons.broken_image_rounded),
+                        ),
+                      ),
+                      Positioned(
+                        left: 6,
+                        right: 6,
+                        bottom: 6,
+                        child: Text(
+                          attachment.caption ?? 'Foto',
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 11,
+                            fontWeight: FontWeight.w900,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                );
+              },
+            ),
+          ),
+        ],
+      ],
+    );
+  }
+}
+
+class _SparepartDraft {
+  final name = TextEditingController();
+  final quantity = TextEditingController(text: '1');
+  final price = TextEditingController();
+
+  Map<String, dynamic> toPayload() {
+    return {
+      'name': name.text.trim(),
+      'quantity': int.tryParse(quantity.text.trim()) ?? 1,
+      'unit_price': double.tryParse(price.text.trim().replaceAll('.', '')) ?? 0,
+    };
+  }
+}
+
+class _SparepartInputRow extends StatelessWidget {
+  const _SparepartInputRow({required this.draft, this.onRemove});
+
+  final _SparepartDraft draft;
+  final VoidCallback? onRemove;
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: [
+        Expanded(
+          flex: 4,
+          child: TextField(
+            controller: draft.name,
+            decoration: const InputDecoration(
+              labelText: 'Nama',
+              border: OutlineInputBorder(),
+            ),
+          ),
+        ),
+        const SizedBox(width: 8),
+        Expanded(
+          flex: 2,
+          child: TextField(
+            controller: draft.quantity,
+            keyboardType: TextInputType.number,
+            decoration: const InputDecoration(
+              labelText: 'Qty',
+              border: OutlineInputBorder(),
+            ),
+          ),
+        ),
+        const SizedBox(width: 8),
+        Expanded(
+          flex: 3,
+          child: TextField(
+            controller: draft.price,
+            keyboardType: TextInputType.number,
+            decoration: const InputDecoration(
+              labelText: 'Harga',
+              prefixText: 'Rp ',
+              border: OutlineInputBorder(),
+            ),
+          ),
+        ),
+        IconButton(
+          onPressed: onRemove,
+          icon: const Icon(Icons.delete_outline_rounded),
+        ),
+      ],
+    );
+  }
+}
+
 class _DetailLine extends StatelessWidget {
   const _DetailLine(this.label, this.value);
 
@@ -527,6 +1066,58 @@ class _DetailLine extends StatelessWidget {
   }
 }
 
+class _CopyableDetailLine extends StatelessWidget {
+  const _CopyableDetailLine(this.label, this.value);
+
+  final String label;
+  final String value;
+
+  @override
+  Widget build(BuildContext context) {
+    final canCopy = value.trim().isNotEmpty && value != '-';
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 8),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          SizedBox(
+            width: 86,
+            child: Text(
+              label,
+              style: const TextStyle(color: AppColors.textSecondary),
+            ),
+          ),
+          Expanded(
+            child: Text(
+              value.isEmpty ? '-' : value,
+              style: const TextStyle(
+                color: AppColors.textPrimary,
+                fontWeight: FontWeight.w800,
+              ),
+            ),
+          ),
+          IconButton(
+            tooltip: 'Salin nomor telepon',
+            visualDensity: VisualDensity.compact,
+            onPressed: canCopy
+                ? () async {
+                    await Clipboard.setData(ClipboardData(text: value));
+                    if (!context.mounted) return;
+                    AppFeedback.success(
+                      context,
+                      title: 'Nomor disalin',
+                      message: 'Nomor telepon customer sudah disalin.',
+                    );
+                  }
+                : null,
+            icon: const Icon(Icons.copy_rounded, size: 18),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
 class _TechnicianOrdersData {
   const _TechnicianOrdersData({required this.technician, required this.orders});
 
@@ -537,10 +1128,7 @@ class _TechnicianOrdersData {
 String _nextStatus(String status) => switch (status) {
   'accepted' => 'on_the_way',
   'on_the_way' => 'inspection',
-  'inspection' => 'waiting_price_approval',
-  'waiting_price_approval' => 'in_progress',
   'in_progress' => 'waiting_payment',
-  'waiting_payment' => 'completed',
   _ => status,
 };
 

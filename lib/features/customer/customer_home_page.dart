@@ -7,6 +7,7 @@ import '../../core/models/mobile_models.dart';
 import '../../core/services/location_service.dart';
 import '../../core/services/marketplace_repository.dart';
 import '../../shared/mobile_ui.dart';
+import '../notifications/notifications_page.dart';
 import 'technician_detail_page.dart';
 
 class CustomerHomePage extends StatefulWidget {
@@ -93,10 +94,10 @@ class _CustomerHomePageState extends State<CustomerHomePage> {
     return Container(
       decoration: const BoxDecoration(
         gradient: LinearGradient(
-          colors: [Color(0xFFEAF3FF), Color(0xFFFAFCFF), Color(0xFFFFFFFF)],
+          colors: [Color(0xFFE3EFFF), Color(0xFFF7FAFF), Color(0xFFFFFFFF)],
           begin: Alignment.topCenter,
           end: Alignment.bottomCenter,
-          stops: [0.0, 0.28, 0.5],
+          stops: [0.0, 0.3, 0.55],
         ),
       ),
       child: SafeArea(
@@ -149,30 +150,29 @@ class _CustomerHomePageState extends State<CustomerHomePage> {
                 ),
                 children: [
                   const _CustomerBrandHeader(),
-                  const SizedBox(height: 18),
+                  const SizedBox(height: 26),
+                  const _FadeSlideIn(index: 0, child: _HomeGreeting()),
+                  const SizedBox(height: 22),
                   _FadeSlideIn(
-                    index: 0,
+                    index: 1,
                     child: _SearchLocationBar(
                       controller: _searchController,
                       locationLabel: data.locationLabel,
                       detected: data.hasDetectedLocation,
                     ),
                   ),
-                  const SizedBox(height: 20),
-                  _FadeSlideIn(
-                    index: 1,
-                    child: _ActiveOrderPanel(
-                      order: latestActiveOrder,
-                      onTap: widget.onGoToOrders,
-                    ),
-                  ),
-                  const SizedBox(height: 28),
+                  if (!data.hasDetectedLocation) ...[
+                    const SizedBox(height: 14),
+                    const _LocationWarningCard(),
+                  ],
+                  const SizedBox(height: 26),
                   _FadeSlideIn(
                     index: 2,
                     child: _SectionLabel(
-                      icon: Icons.home_repair_service_rounded,
+                      icon: Icons.grid_view_rounded,
                       title: 'Kategori Layanan',
-                      trailing: '${data.categories.length}',
+                      trailing: 'Lihat semua',
+                      onTrailingTap: _refresh,
                     ),
                   ),
                   const SizedBox(height: 14),
@@ -195,10 +195,9 @@ class _CustomerHomePageState extends State<CustomerHomePage> {
                       icon: Icons.engineering_rounded,
                       title: selectedCategory == null
                           ? 'Teknisi Terdekat'
-                          : 'Teknisi ${selectedCategory.name} Terdekat',
-                      trailing: data.hasDetectedLocation
-                          ? data.locationLabel ?? 'Terdekat'
-                          : '${technicians.length}',
+                          : 'Teknisi ${selectedCategory.name}',
+                      trailing: 'Lihat semua',
+                      onTrailingTap: _refresh,
                     ),
                   ),
                   const SizedBox(height: 14),
@@ -230,26 +229,11 @@ class _CustomerHomePageState extends State<CustomerHomePage> {
                   const SizedBox(height: 22),
                   _FadeSlideIn(
                     index: 7,
-                    child: _SectionLabel(
-                      icon: Icons.receipt_long_rounded,
-                      title: 'Pesanan Terbaru',
-                      trailing: '${data.orders.length}',
+                    child: _OrderShortcut(
+                      activeOrder: latestActiveOrder,
+                      onTap: widget.onGoToOrders,
                     ),
                   ),
-                  const SizedBox(height: 12),
-                  if (data.orders.isEmpty)
-                    const SizedBox(
-                      height: 180,
-                      child: EmptyState(message: 'Belum ada pesanan'),
-                    )
-                  else
-                    for (final entry in data.orders.take(3).indexed) ...[
-                      _FadeSlideIn(
-                        index: 8 + entry.$1,
-                        child: _CustomerOrderPreview(order: entry.$2),
-                      ),
-                      const SizedBox(height: 12),
-                    ],
                 ],
               ),
             );
@@ -260,7 +244,7 @@ class _CustomerHomePageState extends State<CustomerHomePage> {
   }
 }
 
-/// Skeleton-style loading state — terasa lebih hidup daripada spinner polos.
+/// Skeleton-style loading state.
 class _LoadingState extends StatelessWidget {
   const _LoadingState();
 
@@ -350,7 +334,7 @@ class _ShimmerBlockState extends State<_ShimmerBlock>
   }
 }
 
-/// Fade + slide-up sederhana untuk setiap blok section saat halaman dibuka.
+/// Fade + slide-up untuk setiap section saat halaman dibuka.
 class _FadeSlideIn extends StatefulWidget {
   const _FadeSlideIn({required this.child, required this.index});
 
@@ -440,7 +424,142 @@ class _CustomerBrandHeader extends StatelessWidget {
   }
 }
 
-/// Logo dengan animasi "pop" kecil saat halaman dibuka — murni dekoratif.
+class _HomeGreeting extends StatelessWidget {
+  const _HomeGreeting();
+
+  @override
+  Widget build(BuildContext context) {
+    return const Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          'Halo, Selamat Datang!',
+          style: TextStyle(
+            color: Color(0xFF07143D),
+            fontSize: 25,
+            fontWeight: FontWeight.w900,
+            letterSpacing: 0,
+          ),
+        ),
+        SizedBox(height: 6),
+        Text(
+          'Butuh bantuan teknisi? Kami siap membantumu.',
+          style: TextStyle(
+            color: Color(0xFF51607A),
+            fontSize: 15,
+            fontWeight: FontWeight.w500,
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+/// Label section dengan ikon ber-aksen warna dan garis bawah, plus tombol aksi
+/// opsional yang dibungkus chip lembut agar terasa "tappable".
+class _SectionLabel extends StatelessWidget {
+  const _SectionLabel({
+    required this.icon,
+    required this.title,
+    this.trailing,
+    this.onTrailingTap,
+  });
+
+  final IconData icon;
+  final String title;
+  final String? trailing;
+  final VoidCallback? onTrailingTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: [
+        Container(
+          width: 34,
+          height: 34,
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+              colors: [
+                AppColors.primary.withValues(alpha: 0.18),
+                AppColors.primary.withValues(alpha: 0.06),
+              ],
+            ),
+            borderRadius: BorderRadius.circular(11),
+          ),
+          child: Icon(icon, color: AppColors.primary, size: 18),
+        ),
+        const SizedBox(width: 10),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                title,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(
+                  color: Color(0xFF07143D),
+                  fontSize: 19,
+                  fontWeight: FontWeight.w900,
+                  letterSpacing: 0,
+                ),
+              ),
+              const SizedBox(height: 3),
+              Container(
+                width: 22,
+                height: 3.5,
+                decoration: BoxDecoration(
+                  color: AppColors.primary,
+                  borderRadius: BorderRadius.circular(4),
+                ),
+              ),
+            ],
+          ),
+        ),
+        if (trailing != null) ...[
+          const SizedBox(width: 8),
+          _PressableScale(
+            onTap: onTrailingTap,
+            borderRadius: 20,
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 6),
+              decoration: BoxDecoration(
+                color: AppColors.primary.withValues(alpha: 0.10),
+                borderRadius: BorderRadius.circular(20),
+                border: Border.all(
+                  color: AppColors.primary.withValues(alpha: 0.18),
+                ),
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    trailing!,
+                    style: const TextStyle(
+                      color: AppColors.primary,
+                      fontSize: 12,
+                      fontWeight: FontWeight.w900,
+                    ),
+                  ),
+                  const SizedBox(width: 2),
+                  const Icon(
+                    Icons.chevron_right_rounded,
+                    size: 15,
+                    color: AppColors.primary,
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ],
+      ],
+    );
+  }
+}
+
 class _BouncyLogo extends StatefulWidget {
   const _BouncyLogo();
 
@@ -471,6 +590,39 @@ class _BouncyLogoState extends State<_BouncyLogo>
   }
 }
 
+class _LocationWarningCard extends StatelessWidget {
+  const _LocationWarningCard();
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: const Color(0xFFFFF7E8),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: const Color(0xFFFFDCA3)),
+      ),
+      child: const Row(
+        children: [
+          Icon(Icons.location_off_rounded, color: Color(0xFFE58B00)),
+          SizedBox(width: 10),
+          Expanded(
+            child: Text(
+              'Lokasi belum lengkap. Hasil teknisi terdekat memakai data umum sampai lokasi aktif tersimpan.',
+              style: TextStyle(
+                color: Color(0xFF6B4A13),
+                fontSize: 12,
+                height: 1.3,
+                fontWeight: FontWeight.w800,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
 class _NotificationButton extends StatefulWidget {
   const _NotificationButton();
 
@@ -484,6 +636,9 @@ class _NotificationButtonState extends State<_NotificationButton> {
   @override
   Widget build(BuildContext context) {
     return GestureDetector(
+      onTap: () => Navigator.of(
+        context,
+      ).push(MaterialPageRoute(builder: (_) => const NotificationsPage())),
       onTapDown: (_) => setState(() => _pressed = true),
       onTapCancel: () => setState(() => _pressed = false),
       onTapUp: (_) => setState(() => _pressed = false),
@@ -506,7 +661,6 @@ class _NotificationButtonState extends State<_NotificationButton> {
   }
 }
 
-/// Titik notifikasi yang berdenyut halus agar ikon lonceng terasa "hidup".
 class _PulsingDot extends StatefulWidget {
   const _PulsingDot({required this.color});
 
@@ -555,204 +709,6 @@ class _PulsingDotState extends State<_PulsingDot>
           ),
         );
       },
-    );
-  }
-}
-
-class _SectionLabel extends StatelessWidget {
-  const _SectionLabel({required this.icon, required this.title, this.trailing});
-
-  final IconData icon;
-  final String title;
-  final String? trailing;
-
-  @override
-  Widget build(BuildContext context) {
-    return Row(
-      children: [
-        Container(
-          width: 32,
-          height: 32,
-          decoration: BoxDecoration(
-            gradient: LinearGradient(
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
-              colors: [
-                AppColors.primary.withValues(alpha: 0.16),
-                AppColors.primary.withValues(alpha: 0.06),
-              ],
-            ),
-            borderRadius: BorderRadius.circular(10),
-          ),
-          child: Icon(icon, color: AppColors.primary, size: 17),
-        ),
-        const SizedBox(width: 10),
-        Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Text(
-                title,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: const TextStyle(
-                  color: AppColors.textPrimary,
-                  fontSize: 19,
-                  fontWeight: FontWeight.w900,
-                  letterSpacing: 0,
-                ),
-              ),
-              const SizedBox(height: 3),
-              Container(
-                width: 22,
-                height: 3.5,
-                decoration: BoxDecoration(
-                  color: AppColors.primary,
-                  borderRadius: BorderRadius.circular(4),
-                ),
-              ),
-            ],
-          ),
-        ),
-        if (trailing != null) ...[
-          const SizedBox(width: 8),
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 4),
-            decoration: BoxDecoration(
-              color: AppColors.primary.withValues(alpha: 0.10),
-              borderRadius: BorderRadius.circular(20),
-              border: Border.all(
-                color: AppColors.primary.withValues(alpha: 0.18),
-              ),
-            ),
-            child: Text(
-              trailing!,
-              style: const TextStyle(
-                color: AppColors.primary,
-                fontSize: 12,
-                fontWeight: FontWeight.w900,
-              ),
-            ),
-          ),
-        ],
-      ],
-    );
-  }
-}
-
-class _ActiveOrderPanel extends StatelessWidget {
-  const _ActiveOrderPanel({required this.order, required this.onTap});
-
-  final OrderSummary? order;
-  final VoidCallback? onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    final order = this.order;
-    final accent = order == null
-        ? AppColors.primary
-        : orderStatusColor(order.status);
-
-    return _PressableScale(
-      onTap: onTap,
-      borderRadius: 20,
-      child: Container(
-        padding: const EdgeInsets.all(16),
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(20),
-          border: Border.all(color: const Color(0xFFE7EEF7)),
-          boxShadow: [
-            BoxShadow(
-              color: accent.withValues(alpha: 0.16),
-              blurRadius: 20,
-              offset: const Offset(0, 10),
-            ),
-          ],
-        ),
-        child: Row(
-          children: [
-            Container(
-              width: 54,
-              height: 54,
-              decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
-                  colors: [
-                    accent.withValues(alpha: 0.18),
-                    accent.withValues(alpha: 0.08),
-                  ],
-                ),
-                borderRadius: BorderRadius.circular(17),
-              ),
-              child: Icon(
-                order == null
-                    ? Icons.add_task_rounded
-                    : Icons.assignment_turned_in_rounded,
-                color: accent,
-              ),
-            ),
-            const SizedBox(width: 14),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    children: [
-                      Flexible(
-                        child: Text(
-                          order == null
-                              ? 'Belum ada pesanan aktif'
-                              : 'Pesanan aktif',
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: const TextStyle(
-                            color: AppColors.textPrimary,
-                            fontSize: 15,
-                            fontWeight: FontWeight.w900,
-                          ),
-                        ),
-                      ),
-                      if (order != null) ...[
-                        const SizedBox(width: 8),
-                        StatusPill(
-                          label: orderStatusLabel(order.status),
-                          color: accent,
-                        ),
-                      ],
-                    ],
-                  ),
-                  const SizedBox(height: 5),
-                  Text(
-                    order == null
-                        ? 'Pilih layanan dan teknisi untuk mulai memesan.'
-                        : 'Bersama ${order.technicianName}',
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(
-                      color: AppColors.textSecondary,
-                      fontSize: 12,
-                      height: 1.25,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            const SizedBox(width: 8),
-            Container(
-              padding: const EdgeInsets.all(6),
-              decoration: BoxDecoration(
-                color: accent.withValues(alpha: 0.10),
-                shape: BoxShape.circle,
-              ),
-              child: Icon(Icons.chevron_right_rounded, color: accent, size: 20),
-            ),
-          ],
-        ),
-      ),
     );
   }
 }
@@ -949,106 +905,133 @@ class _CategoryGrid extends StatelessWidget {
       );
     }
     final visible = categories.take(6).toList();
-    return GridView.builder(
-      itemCount: visible.length,
-      shrinkWrap: true,
-      physics: const NeverScrollableScrollPhysics(),
-      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-        crossAxisCount: 3,
-        mainAxisSpacing: 12,
-        crossAxisSpacing: 12,
-        childAspectRatio: 0.96,
-      ),
-      itemBuilder: (context, index) {
-        final category = visible[index];
-        final selectedCategory = selected?.id == category.id;
-        return _PressableScale(
-          onTap: () => onTap(category),
-          borderRadius: 16,
-          child: AnimatedContainer(
-            duration: const Duration(milliseconds: 200),
-            curve: Curves.easeOut,
-            decoration: BoxDecoration(
-              color: selectedCategory
-                  ? AppColors.primary.withValues(alpha: 0.05)
-                  : Colors.white,
-              borderRadius: BorderRadius.circular(16),
-              border: Border.all(
-                color: selectedCategory
-                    ? AppColors.primary
-                    : const Color(0xFFE7EEF7),
-                width: selectedCategory ? 1.8 : 1,
-              ),
-              boxShadow: [
-                BoxShadow(
-                  color:
-                      (selectedCategory
-                              ? AppColors.primary
-                              : const Color(0xFF234D79))
-                          .withValues(alpha: selectedCategory ? 0.16 : 0.08),
-                  blurRadius: selectedCategory ? 20 : 16,
-                  offset: const Offset(0, 8),
-                ),
-              ],
-            ),
-            padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 12),
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                _CategoryIcon(category: category, active: selectedCategory),
-                const SizedBox(height: 10),
-                Text(
-                  category.name,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  textAlign: TextAlign.center,
-                  style: TextStyle(
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final compact = constraints.maxWidth < 350;
+        return GridView.builder(
+          itemCount: visible.length,
+          shrinkWrap: true,
+          physics: const NeverScrollableScrollPhysics(),
+          gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+            crossAxisCount: 3,
+            mainAxisSpacing: 12,
+            crossAxisSpacing: 12,
+            childAspectRatio: compact ? 0.70 : 0.76,
+          ),
+          itemBuilder: (context, index) {
+            final category = visible[index];
+            final selectedCategory = selected?.id == category.id;
+            return _PressableScale(
+              onTap: () => onTap(category),
+              borderRadius: 16,
+              child: AnimatedContainer(
+                duration: const Duration(milliseconds: 200),
+                curve: Curves.easeOut,
+                decoration: BoxDecoration(
+                  color: selectedCategory
+                      ? AppColors.primary.withValues(alpha: 0.05)
+                      : Colors.white,
+                  borderRadius: BorderRadius.circular(16),
+                  border: Border.all(
                     color: selectedCategory
                         ? AppColors.primary
-                        : const Color(0xFF07143D),
-                    fontSize: 14,
-                    fontWeight: FontWeight.w900,
-                    height: 1.05,
+                        : const Color(0xFFE7EEF7),
+                    width: selectedCategory ? 1.8 : 1,
                   ),
+                  boxShadow: [
+                    BoxShadow(
+                      color:
+                          (selectedCategory
+                                  ? AppColors.primary
+                                  : const Color(0xFF234D79))
+                              .withValues(
+                                alpha: selectedCategory ? 0.16 : 0.08,
+                              ),
+                      blurRadius: selectedCategory ? 20 : 16,
+                      offset: const Offset(0, 8),
+                    ),
+                  ],
                 ),
-                const SizedBox(height: 4),
-                Text(
-                  category.description?.trim().isNotEmpty == true
-                      ? category.description!.trim()
-                      : _categorySubtitle(category.name),
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
-                  textAlign: TextAlign.center,
-                  style: const TextStyle(
-                    color: Color(0xFF59657C),
-                    fontSize: 11,
-                    fontWeight: FontWeight.w600,
-                    height: 1.18,
-                  ),
+                padding: EdgeInsets.symmetric(
+                  horizontal: compact ? 6 : 8,
+                  vertical: compact ? 9 : 11,
                 ),
-              ],
-            ),
-          ),
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    _CategoryIcon(
+                      category: category,
+                      active: selectedCategory,
+                      compact: compact,
+                    ),
+                    SizedBox(height: compact ? 8 : 10),
+                    Text(
+                      category.name,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      textAlign: TextAlign.center,
+                      style: TextStyle(
+                        color: selectedCategory
+                            ? AppColors.primary
+                            : const Color(0xFF07143D),
+                        fontSize: compact ? 12.5 : 14,
+                        fontWeight: FontWeight.w900,
+                        height: 1.05,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Flexible(
+                      child: Text(
+                        category.description?.trim().isNotEmpty == true
+                            ? category.description!.trim()
+                            : _categorySubtitle(category.name),
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                        textAlign: TextAlign.center,
+                        style: TextStyle(
+                          color: const Color(0xFF59657C),
+                          fontSize: compact ? 10.5 : 11,
+                          fontWeight: FontWeight.w600,
+                          height: 1.15,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            );
+          },
         );
       },
     );
   }
 }
 
+/// Ikon kategori — sekarang dibungkus dalam lingkaran dengan padding tetap
+/// dan `BoxFit.cover` + `ClipOval`, sehingga gambar jaringan apa pun (potret,
+/// landscape, persegi) selalu terlihat memenuhi bentuk bulat tanpa terpotong
+/// aneh, terdistorsi, atau menyembul keluar dari border.
 class _CategoryIcon extends StatelessWidget {
-  const _CategoryIcon({required this.category, this.active = false});
+  const _CategoryIcon({
+    required this.category,
+    this.active = false,
+    this.compact = false,
+  });
 
   final ServiceCategory category;
   final bool active;
+  final bool compact;
 
   @override
   Widget build(BuildContext context) {
     final iconUrl = category.iconUrl;
+    final hasImage = iconUrl != null && iconUrl.isNotEmpty;
+    final size = compact ? 46.0 : 52.0;
+
     return AnimatedContainer(
       duration: const Duration(milliseconds: 200),
-      width: 52,
-      height: 52,
-      padding: const EdgeInsets.all(8),
+      width: size,
+      height: size,
       decoration: BoxDecoration(
         gradient: LinearGradient(
           begin: Alignment.topLeft,
@@ -1060,25 +1043,51 @@ class _CategoryIcon extends StatelessWidget {
                 ]
               : const [Color(0xFFEAF4FF), Color(0xFFFFF4E7)],
         ),
-        borderRadius: BorderRadius.circular(16),
-        border: active
-            ? Border.all(color: AppColors.primary.withValues(alpha: 0.35))
-            : null,
+        shape: BoxShape.circle,
+        border: Border.all(
+          color: active
+              ? AppColors.primary.withValues(alpha: 0.35)
+              : Colors.white,
+          width: active ? 1.4 : 2,
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: const Color(0xFF234D79).withValues(alpha: 0.10),
+            blurRadius: 8,
+            offset: const Offset(0, 4),
+          ),
+        ],
       ),
-      child: iconUrl == null || iconUrl.isEmpty
-          ? Icon(
+      child: hasImage
+          ? ClipOval(
+              child: Padding(
+                // Sedikit padding agar logo persegi/lonjong tetap "bernapas"
+                // di dalam lingkaran, bukan menempel pas di tepi.
+                padding: const EdgeInsets.all(6),
+                child: Image.network(
+                  iconUrl,
+                  fit: BoxFit.contain,
+                  alignment: Alignment.center,
+                  errorBuilder: (_, _, _) => Icon(
+                    categoryIcon(category.name),
+                    color: const Color(0xFF1269D3),
+                    size: compact ? 28 : 32,
+                  ),
+                  loadingBuilder: (context, child, progress) {
+                    if (progress == null) return child;
+                    return Icon(
+                      categoryIcon(category.name),
+                      color: const Color(0xFF1269D3),
+                      size: compact ? 28 : 32,
+                    );
+                  },
+                ),
+              ),
+            )
+          : Icon(
               categoryIcon(category.name),
               color: const Color(0xFF1269D3),
-              size: 36,
-            )
-          : Image.network(
-              iconUrl,
-              fit: BoxFit.contain,
-              errorBuilder: (_, _, _) => Icon(
-                categoryIcon(category.name),
-                color: const Color(0xFF1269D3),
-                size: 36,
-              ),
+              size: compact ? 30 : 34,
             ),
     );
   }
@@ -1093,17 +1102,20 @@ class _TechnicianStrip extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return SizedBox(
-      height: 212,
+      height: 166,
       child: ListView.separated(
         scrollDirection: Axis.horizontal,
-        padding: const EdgeInsets.only(right: 4),
-        itemCount: technicians.take(6).length,
+        physics: const BouncingScrollPhysics(),
+        itemCount: technicians.length,
         separatorBuilder: (_, _) => const SizedBox(width: 12),
         itemBuilder: (context, index) {
           final technician = technicians[index];
-          return _TechnicianCard(
-            technician: technician,
-            onTap: () => onTap(technician),
+          return SizedBox(
+            width: 184,
+            child: _TechnicianCard(
+              technician: technician,
+              onTap: () => onTap(technician),
+            ),
           );
         },
       ),
@@ -1121,293 +1133,255 @@ class _TechnicianCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final isNew = technician.rating == 0;
     final rating = isNew ? 'Baru' : technician.rating.toStringAsFixed(1);
-    final mainSkill = technician.skills.isEmpty
+    final distance = technician.distanceKm;
+    final imageUrl = technician.profileImageUrl;
+    final skill = technician.skills.isEmpty
         ? 'Spesialis Teknisi'
         : 'Spesialis ${technician.skills.take(2).join(' & ')}';
-    final distance = technician.distanceKm;
-    return SizedBox(
-      width: 220,
-      child: _PressableScale(
-        onTap: onTap,
-        borderRadius: 20,
-        child: Container(
-          decoration: _softDecoration(radius: 20),
-          padding: const EdgeInsets.all(12),
-          child: Column(
-            children: [
-              Row(
-                children: [
-                  Stack(
-                    clipBehavior: Clip.none,
-                    children: [
-                      Container(
-                        width: 64,
-                        height: 64,
-                        decoration: BoxDecoration(
-                          gradient: LinearGradient(
-                            begin: Alignment.topLeft,
-                            end: Alignment.bottomRight,
-                            colors: [
-                              AppColors.primary.withValues(alpha: 0.18),
-                              AppColors.primary.withValues(alpha: 0.06),
-                            ],
-                          ),
-                          borderRadius: BorderRadius.circular(20),
-                        ),
-                        child: const Icon(
-                          Icons.engineering_rounded,
-                          color: Color(0xFF1269D3),
-                          size: 38,
-                        ),
-                      ),
-                      Positioned(
-                        right: 1,
-                        bottom: 2,
-                        child: Container(
-                          width: 14,
-                          height: 14,
-                          decoration: BoxDecoration(
-                            color: const Color(0xFF12B956),
-                            shape: BoxShape.circle,
-                            border: Border.all(color: Colors.white, width: 2),
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(width: 10),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          technician.name,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: const TextStyle(
-                            color: Color(0xFF07143D),
-                            fontSize: 15,
-                            fontWeight: FontWeight.w900,
-                          ),
-                        ),
-                        const SizedBox(height: 5),
-                        Row(
-                          children: [
-                            Container(
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 6,
-                                vertical: 2,
-                              ),
-                              decoration: BoxDecoration(
-                                color: isNew
-                                    ? const Color(0xFFEFF3F9)
-                                    : const Color(0xFFFFF6E0),
-                                borderRadius: BorderRadius.circular(999),
-                              ),
-                              child: Row(
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  Icon(
-                                    isNew
-                                        ? Icons.auto_awesome_rounded
-                                        : Icons.star_rounded,
-                                    color: isNew
-                                        ? const Color(0xFF6A748B)
-                                        : const Color(0xFFFFB20E),
-                                    size: 14,
-                                  ),
-                                  const SizedBox(width: 3),
-                                  Text(
-                                    rating,
-                                    style: const TextStyle(
-                                      color: Color(0xFF07143D),
-                                      fontSize: 12,
-                                      fontWeight: FontWeight.w900,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                            Text(
-                              technician.completedJobs > 0
-                                  ? ' (${technician.completedJobs})'
-                                  : '',
-                              style: const TextStyle(
-                                color: Color(0xFF6A748B),
-                                fontSize: 12,
-                              ),
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: 6),
-                        Text(
-                          mainSkill,
-                          maxLines: 2,
-                          overflow: TextOverflow.ellipsis,
-                          style: const TextStyle(
-                            color: Color(0xFF59657C),
-                            fontSize: 12,
-                            fontWeight: FontWeight.w600,
-                            height: 1.15,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 9),
-              Row(
-                children: [
-                  if (distance != null) ...[
+
+    return _PressableScale(
+      onTap: onTap,
+      borderRadius: 18,
+      child: Container(
+        height: 160,
+        decoration: _softDecoration(radius: 18),
+        padding: const EdgeInsets.all(13),
+        child: Column(
+          children: [
+            Row(
+              children: [
+                Stack(
+                  clipBehavior: Clip.none,
+                  children: [
+                    // Avatar dibungkus ClipOval terpisah dari border, jadi
+                    // foto teknisi selalu mengikuti bentuk bulat dan tidak
+                    // pernah mengintip keluar dari ring putih di sekitarnya.
                     Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 9,
-                        vertical: 4,
-                      ),
+                      width: 62,
+                      height: 62,
                       decoration: BoxDecoration(
-                        color: AppColors.primary.withValues(alpha: 0.10),
-                        borderRadius: BorderRadius.circular(999),
-                      ),
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          const Icon(
-                            Icons.near_me_rounded,
-                            size: 12,
-                            color: AppColors.primary,
+                        shape: BoxShape.circle,
+                        border: Border.all(color: Colors.white, width: 3),
+                        boxShadow: [
+                          BoxShadow(
+                            color: const Color(
+                              0xFF234D79,
+                            ).withValues(alpha: 0.12),
+                            blurRadius: 10,
+                            offset: const Offset(0, 5),
                           ),
-                          const SizedBox(width: 3),
-                          Text(
-                            '${distance.toStringAsFixed(distance < 10 ? 1 : 0)} km',
-                            style: const TextStyle(
-                              color: AppColors.primary,
-                              fontSize: 12,
-                              fontWeight: FontWeight.w900,
+                        ],
+                      ),
+                      child: ClipOval(
+                        child: Container(
+                          color: const Color(0xFFEAF4FF),
+                          child: imageUrl != null && imageUrl.isNotEmpty
+                              ? Image.network(
+                                  imageUrl,
+                                  fit: BoxFit.cover,
+                                  width: double.infinity,
+                                  height: double.infinity,
+                                  errorBuilder: (_, _, _) => const Icon(
+                                    Icons.engineering_rounded,
+                                    color: AppColors.primary,
+                                    size: 32,
+                                  ),
+                                )
+                              : const Icon(
+                                  Icons.engineering_rounded,
+                                  color: AppColors.primary,
+                                  size: 32,
+                                ),
+                        ),
+                      ),
+                    ),
+                    Positioned(
+                      right: 0,
+                      bottom: 2,
+                      child: Container(
+                        width: 14,
+                        height: 14,
+                        decoration: BoxDecoration(
+                          color: const Color(0xFF12B956),
+                          shape: BoxShape.circle,
+                          border: Border.all(color: Colors.white, width: 2),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        technician.name,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                          color: Color(0xFF07143D),
+                          fontSize: 15,
+                          fontWeight: FontWeight.w900,
+                          height: 1.1,
+                        ),
+                      ),
+                      const SizedBox(height: 5),
+                      Row(
+                        children: [
+                          Icon(
+                            isNew
+                                ? Icons.auto_awesome_rounded
+                                : Icons.star_rounded,
+                            color: isNew
+                                ? const Color(0xFF6A748B)
+                                : const Color(0xFFFFB20E),
+                            size: 17,
+                          ),
+                          const SizedBox(width: 4),
+                          Flexible(
+                            child: Text(
+                              isNew
+                                  ? 'Baru'
+                                  : '$rating (${technician.completedJobs})',
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: const TextStyle(
+                                color: Color(0xFF263A63),
+                                fontSize: 13,
+                                fontWeight: FontWeight.w800,
+                              ),
                             ),
                           ),
                         ],
                       ),
-                    ),
-                    const SizedBox(width: 6),
-                  ],
-                  Expanded(
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 9,
-                        vertical: 4,
-                      ),
-                      decoration: BoxDecoration(
-                        color: AppColors.accent.withValues(alpha: 0.14),
-                        borderRadius: BorderRadius.circular(999),
-                      ),
-                      child: Text(
-                        technician.serviceArea,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(
-                          color: Color(0xFF9B5A12),
-                          fontSize: 12,
-                          fontWeight: FontWeight.w800,
-                        ),
-                      ),
-                    ),
+                    ],
                   ),
-                ],
+                ),
+              ],
+            ),
+            const SizedBox(height: 10),
+            Text(
+              skill,
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+              style: const TextStyle(
+                color: Color(0xFF59657C),
+                fontSize: 12,
+                fontWeight: FontWeight.w600,
+                height: 1.25,
               ),
-              const Spacer(),
-              const Divider(height: 18, color: Color(0xFFE1E8F0)),
-              Row(
-                children: [
-                  const Expanded(
-                    child: Text(
-                      'Lihat profil teknisi',
-                      style: TextStyle(
-                        color: Color(0xFF59657C),
-                        fontSize: 12,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
+            ),
+            const Spacer(),
+            Container(height: 1, color: const Color(0xFFE4ECF6)),
+            const SizedBox(height: 9),
+            Row(
+              children: [
+                const Text(
+                  'Area',
+                  style: TextStyle(
+                    color: Color(0xFF6A748B),
+                    fontSize: 11,
+                    fontWeight: FontWeight.w600,
                   ),
+                ),
+                const Spacer(),
+                if (distance != null) ...[
                   Container(
                     padding: const EdgeInsets.symmetric(
-                      horizontal: 10,
-                      vertical: 5,
+                      horizontal: 8,
+                      vertical: 4,
                     ),
                     decoration: BoxDecoration(
-                      color: AppColors.primary,
+                      color: AppColors.primary.withValues(alpha: 0.08),
                       borderRadius: BorderRadius.circular(999),
                     ),
-                    child: const Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Text(
-                          'Detail',
-                          style: TextStyle(
-                            color: Colors.white,
-                            fontSize: 12,
-                            fontWeight: FontWeight.w800,
-                          ),
-                        ),
-                        SizedBox(width: 2),
-                        Icon(
-                          Icons.arrow_forward_rounded,
-                          color: Colors.white,
-                          size: 13,
-                        ),
-                      ],
+                    child: Text(
+                      '${distance.toStringAsFixed(distance < 10 ? 1 : 0)} km',
+                      style: const TextStyle(
+                        color: AppColors.primary,
+                        fontSize: 11,
+                        fontWeight: FontWeight.w900,
+                      ),
                     ),
                   ),
-                ],
-              ),
-            ],
-          ),
+                ] else
+                  Flexible(
+                    child: Text(
+                      technician.serviceArea,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      textAlign: TextAlign.right,
+                      style: const TextStyle(
+                        color: AppColors.primary,
+                        fontSize: 12,
+                        fontWeight: FontWeight.w900,
+                      ),
+                    ),
+                  ),
+              ],
+            ),
+          ],
         ),
       ),
     );
   }
 }
 
+/// Banner promo dengan dekorasi lingkaran transparan, gradasi lebih kaya,
+/// dan logo aplikasi yang dibungkus rapi di dalam chip bundar putih
+/// transparan agar tidak pernah terlihat "gepeng" atau melebihi batasnya.
 class _PromoBanner extends StatelessWidget {
   const _PromoBanner();
 
   @override
   Widget build(BuildContext context) {
     return ClipRRect(
-      borderRadius: BorderRadius.circular(18),
+      borderRadius: BorderRadius.circular(20),
       child: Container(
-        height: 136,
+        height: 140,
         decoration: const BoxDecoration(
           gradient: LinearGradient(
-            begin: Alignment.centerLeft,
-            end: Alignment.centerRight,
-            colors: [Color(0xFF075AC8), Color(0xFF0986F6)],
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: [Color(0xFF064DB0), Color(0xFF0B8CFA), Color(0xFF35B0FF)],
           ),
         ),
         child: Stack(
           children: [
-            // Pola dekoratif lingkaran transparan untuk kedalaman visual.
             Positioned(
-              right: -24,
-              top: -24,
+              right: -26,
+              top: -26,
               child: Container(
-                width: 120,
-                height: 120,
+                width: 130,
+                height: 130,
                 decoration: BoxDecoration(
                   shape: BoxShape.circle,
-                  color: Colors.white.withValues(alpha: 0.06),
+                  color: Colors.white.withValues(alpha: 0.07),
                 ),
               ),
             ),
             Positioned(
-              right: 36,
-              bottom: -36,
+              right: 30,
+              bottom: -44,
               child: Container(
-                width: 90,
-                height: 90,
+                width: 96,
+                height: 96,
                 decoration: BoxDecoration(
                   shape: BoxShape.circle,
                   color: Colors.white.withValues(alpha: 0.08),
+                ),
+              ),
+            ),
+            Positioned(
+              left: -18,
+              bottom: -30,
+              child: Container(
+                width: 80,
+                height: 80,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: Colors.white.withValues(alpha: 0.05),
                 ),
               ),
             ),
@@ -1418,14 +1392,23 @@ class _PromoBanner extends StatelessWidget {
                   Container(
                     width: 64,
                     height: 64,
-                    padding: const EdgeInsets.all(5),
+                    padding: const EdgeInsets.all(11),
                     decoration: BoxDecoration(
-                      color: Colors.white.withValues(alpha: 0.18),
+                      color: Colors.white.withValues(alpha: 0.20),
                       shape: BoxShape.circle,
+                      border: Border.all(
+                        color: Colors.white.withValues(alpha: 0.35),
+                      ),
                     ),
-                    child: Image.asset(
-                      'assets/logos/logoku.png',
-                      fit: BoxFit.contain,
+                    child: ClipOval(
+                      child: Image.asset(
+                        'assets/logos/logoku.png',
+                        fit: BoxFit.contain,
+                        errorBuilder: (_, _, _) => const Icon(
+                          Icons.home_repair_service_rounded,
+                          color: Colors.white,
+                        ),
+                      ),
                     ),
                   ),
                   const SizedBox(width: 14),
@@ -1462,7 +1445,7 @@ class _PromoBanner extends StatelessWidget {
                   const SizedBox(width: 8),
                   Icon(
                     Icons.home_repair_service_rounded,
-                    color: Colors.white.withValues(alpha: 0.82),
+                    color: Colors.white.withValues(alpha: 0.85),
                     size: 72,
                   ),
                 ],
@@ -1475,178 +1458,119 @@ class _PromoBanner extends StatelessWidget {
   }
 }
 
-class _CustomerOrderPreview extends StatelessWidget {
-  const _CustomerOrderPreview({required this.order});
+class _OrderShortcut extends StatelessWidget {
+  const _OrderShortcut({required this.activeOrder, required this.onTap});
 
-  final OrderSummary order;
+  final OrderSummary? activeOrder;
+  final VoidCallback? onTap;
 
   @override
   Widget build(BuildContext context) {
-    final total = order.finalTotal > 0
-        ? order.finalTotal
-        : order.estimatedTotal;
-    final accent = orderStatusColor(order.status);
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: _softDecoration(radius: 20),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              StatusPill(label: orderStatusLabel(order.status), color: accent),
-              const Spacer(),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                decoration: BoxDecoration(
-                  color: const Color(0xFFF3F6FA),
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: Text(
-                  order.orderNumber,
-                  style: const TextStyle(
-                    color: AppColors.textSecondary,
-                    fontSize: 12,
-                    fontWeight: FontWeight.w700,
-                  ),
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 14),
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Container(
-                width: 58,
-                height: 58,
-                decoration: BoxDecoration(
-                  gradient: LinearGradient(
-                    colors: [
-                      const Color(0xFFEAF4FF),
-                      AppColors.primary.withValues(alpha: 0.12),
-                    ],
-                    begin: Alignment.topLeft,
-                    end: Alignment.bottomRight,
-                  ),
-                  borderRadius: BorderRadius.circular(16),
-                ),
-                child: Icon(
-                  categoryIcon(order.problemDescription),
-                  color: AppColors.primary,
-                  size: 32,
-                ),
-              ),
-              const SizedBox(width: 13),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      order.problemDescription.isEmpty
-                          ? 'Permintaan Layanan'
-                          : order.problemDescription,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(
-                        color: AppColors.textPrimary,
-                        fontSize: 16,
-                        fontWeight: FontWeight.w900,
-                        letterSpacing: 0,
-                      ),
-                    ),
-                    const SizedBox(height: 6),
-                    _PreviewMeta(
-                      icon: Icons.engineering_outlined,
-                      text: 'Teknisi: ${order.technicianName}',
-                    ),
-                    _PreviewMeta(
-                      icon: Icons.calendar_today_outlined,
-                      text:
-                          '${order.scheduleDate} ${_shortTime(order.scheduleTime)}',
-                    ),
+    final hasActiveOrder = activeOrder != null;
+    return _PressableScale(
+      onTap: onTap,
+      borderRadius: 18,
+      child: Container(
+        padding: const EdgeInsets.all(16),
+        decoration: _softDecoration(radius: 18),
+        child: Row(
+          children: [
+            Container(
+              width: 52,
+              height: 52,
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                  colors: [
+                    AppColors.primary,
+                    AppColors.primary.withValues(alpha: 0.75),
                   ],
                 ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 12),
-          Row(
-            children: [
-              Expanded(
-                child: Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 10,
-                    vertical: 8,
+                shape: BoxShape.circle,
+                boxShadow: [
+                  BoxShadow(
+                    color: AppColors.primary.withValues(alpha: 0.30),
+                    blurRadius: 14,
+                    offset: const Offset(0, 6),
                   ),
-                  decoration: BoxDecoration(
-                    color: accent.withValues(alpha: 0.08),
-                    borderRadius: BorderRadius.circular(10),
-                  ),
-                  child: Row(
-                    children: [
-                      Icon(Icons.info_outline_rounded, size: 14, color: accent),
-                      const SizedBox(width: 5),
-                      Expanded(
-                        child: Text(
-                          'Pantau progres pesanan',
-                          overflow: TextOverflow.ellipsis,
-                          style: TextStyle(
-                            color: accent,
-                            fontSize: 12,
-                            fontWeight: FontWeight.w800,
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
+                ],
               ),
-              const SizedBox(width: 10),
-              Text(
-                formatRupiah(total),
-                style: const TextStyle(
-                  color: AppColors.primary,
-                  fontSize: 17,
-                  fontWeight: FontWeight.w900,
-                  letterSpacing: 0,
-                ),
-              ),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _PreviewMeta extends StatelessWidget {
-  const _PreviewMeta({required this.icon, required this.text});
-
-  final IconData icon;
-  final String text;
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.only(top: 4),
-      child: Row(
-        children: [
-          Icon(icon, color: AppColors.textSecondary, size: 16),
-          const SizedBox(width: 5),
-          Expanded(
-            child: Text(
-              text,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: const TextStyle(
-                color: AppColors.textSecondary,
-                fontSize: 12,
-                fontWeight: FontWeight.w600,
+              child: Icon(
+                hasActiveOrder
+                    ? Icons.receipt_long_rounded
+                    : Icons.shopping_bag_rounded,
+                color: Colors.white,
               ),
             ),
-          ),
-        ],
+            const SizedBox(width: 14),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    hasActiveOrder
+                        ? 'Pesanan aktif sedang berjalan'
+                        : 'Pesan layanan lebih cepat',
+                    style: const TextStyle(
+                      color: Color(0xFF07143D),
+                      fontSize: 15,
+                      fontWeight: FontWeight.w900,
+                    ),
+                  ),
+                  const SizedBox(height: 5),
+                  Text(
+                    hasActiveOrder
+                        ? 'Pantau status teknisi dan progres layanan Anda.'
+                        : 'Pilih kategori, cek teknisi, lalu pesan layanan.',
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                      color: Color(0xFF59657C),
+                      fontSize: 12,
+                      height: 1.25,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(width: 10),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 13),
+              decoration: BoxDecoration(
+                color: AppColors.primary,
+                borderRadius: BorderRadius.circular(10),
+                boxShadow: [
+                  BoxShadow(
+                    color: AppColors.primary.withValues(alpha: 0.25),
+                    blurRadius: 10,
+                    offset: const Offset(0, 5),
+                  ),
+                ],
+              ),
+              child: const Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    'Lihat Pesanan',
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontWeight: FontWeight.w800,
+                      fontSize: 12.5,
+                    ),
+                  ),
+                  SizedBox(width: 5),
+                  Icon(
+                    Icons.chevron_right_rounded,
+                    size: 18,
+                    color: Colors.white,
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -1725,11 +1649,6 @@ String _categorySubtitle(String name) {
   if (lower.contains('cctv')) return 'Instalasi &\nPerbaikan';
   if (lower.contains('jaringan')) return 'Instalasi &\nTroubleshooting';
   return 'Servis &\nPerbaikan';
-}
-
-String _shortTime(String value) {
-  if (value.length >= 5) return value.substring(0, 5);
-  return value;
 }
 
 class _CustomerHomeData {

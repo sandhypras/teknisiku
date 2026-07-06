@@ -8,6 +8,7 @@ import '../../core/services/location_service.dart';
 import '../../core/services/marketplace_repository.dart';
 import '../../shared/mobile_ui.dart';
 import '../../shared/widgets/app_feedback.dart';
+import '../notifications/notifications_page.dart';
 
 class TechnicianProfilePage extends StatefulWidget {
   const TechnicianProfilePage({
@@ -799,7 +800,12 @@ class _VerificationTopBar extends StatelessWidget {
           ],
         ),
         const Spacer(),
-        const _SoftButton(icon: Icons.notifications_none_rounded),
+        _SoftButton(
+          icon: Icons.notifications_none_rounded,
+          onTap: () => Navigator.of(
+            context,
+          ).push(MaterialPageRoute(builder: (_) => const NotificationsPage())),
+        ),
       ],
     );
   }
@@ -906,6 +912,7 @@ class _TechnicianIdentityCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final imageUrl = technician?.profileImageUrl ?? profile.profileImageUrl;
     return Container(
       padding: const EdgeInsets.all(18),
       decoration: _profileDecoration(radius: 22),
@@ -929,14 +936,10 @@ class _TechnicianIdentityCard extends StatelessWidget {
                     child: CircleAvatar(
                       radius: 50,
                       backgroundColor: const Color(0xFFEAF4FF),
-                      backgroundImage:
-                          profile.profileImageUrl == null ||
-                              profile.profileImageUrl!.isEmpty
+                      backgroundImage: imageUrl == null || imageUrl.isEmpty
                           ? null
-                          : NetworkImage(profile.profileImageUrl!),
-                      child:
-                          profile.profileImageUrl == null ||
-                              profile.profileImageUrl!.isEmpty
+                          : NetworkImage(imageUrl),
+                      child: imageUrl == null || imageUrl.isEmpty
                           ? Text(
                               _initials(profile.fullName),
                               style: const TextStyle(
@@ -1139,13 +1142,6 @@ class _ChecklistCard extends StatelessWidget {
         'Nama, area layanan, dan deskripsi profil',
         hasProfile,
         hasProfile ? 'Selesai' : 'Isi',
-      ),
-      _ChecklistItemData(
-        Icons.workspace_premium_rounded,
-        'Sertifikat',
-        'Unggah sertifikat keahlian (jika ada)',
-        false,
-        'Unggah',
       ),
       _ChecklistItemData(
         Icons.business_center_rounded,

@@ -158,6 +158,14 @@ String? _publicProfileImageUrl(String? path) {
   return 'profile-images/$value';
 }
 
+String? _publicServiceImageUrl(String? path) {
+  if (path == null || path.trim().isEmpty) return null;
+  final value = path.trim();
+  if (value.startsWith('http')) return value;
+  if (value.startsWith('service-images/')) return value;
+  return 'service-images/$value';
+}
+
 class TechnicianService {
   const TechnicianService({
     required this.id,
@@ -170,6 +178,7 @@ class TechnicianService {
     this.categoryName,
     this.description,
     this.duration,
+    this.imageUrl,
   });
 
   final String id;
@@ -182,6 +191,7 @@ class TechnicianService {
   final String? categoryName;
   final String? description;
   final String? duration;
+  final String? imageUrl;
 
   factory TechnicianService.fromJson(Map<String, dynamic> json) {
     final category = json['category'] as Map<String, dynamic>?;
@@ -194,6 +204,7 @@ class TechnicianService {
       description: json['description'] as String?,
       price: (json['estimated_price'] as num?)?.toDouble() ?? 0,
       duration: json['estimated_duration'] as String?,
+      imageUrl: _publicServiceImageUrl(json['image_url'] as String?),
       status: json['approval_status'] as String? ?? 'pending',
       isActive: json['is_active'] as bool? ?? true,
     );
@@ -281,9 +292,11 @@ class OrderSummary {
     required this.problemDescription,
     required this.finalTotal,
     required this.estimatedTotal,
+    required this.serviceFee,
     required this.scheduleDate,
     required this.scheduleTime,
     required this.customerName,
+    required this.technicianId,
     required this.technicianName,
     required this.createdAt,
     this.customerPhone,
@@ -297,9 +310,11 @@ class OrderSummary {
   final String problemDescription;
   final double finalTotal;
   final double estimatedTotal;
+  final double serviceFee;
   final String scheduleDate;
   final String scheduleTime;
   final String customerName;
+  final String technicianId;
   final String technicianName;
   final DateTime? createdAt;
   final String? customerPhone;
@@ -319,14 +334,57 @@ class OrderSummary {
       problemDescription: json['problem_description'] as String? ?? '',
       finalTotal: (json['final_total'] as num?)?.toDouble() ?? 0,
       estimatedTotal: (json['estimated_total'] as num?)?.toDouble() ?? 0,
+      serviceFee: (json['service_fee'] as num?)?.toDouble() ?? 6000,
       scheduleDate: '${json['schedule_date'] ?? '-'}',
       scheduleTime: '${json['schedule_time'] ?? ''}',
       customerName: customer?['full_name'] as String? ?? '-',
       customerPhone: customer?['phone'] as String?,
+      technicianId: json['technician_id'] as String? ?? '',
       technicianName: technician?['full_name'] as String? ?? '-',
       createdAt: DateTime.tryParse('${json['created_at']}'),
       address: address?['full_address'] as String?,
       city: address?['city'] as String?,
+    );
+  }
+}
+
+class WithdrawalRequest {
+  const WithdrawalRequest({
+    required this.id,
+    required this.technicianId,
+    required this.amount,
+    required this.bankName,
+    required this.accountNumber,
+    required this.accountHolder,
+    required this.status,
+    this.adminNote,
+    this.requestedAt,
+    this.processedAt,
+  });
+
+  final String id;
+  final String technicianId;
+  final double amount;
+  final String bankName;
+  final String accountNumber;
+  final String accountHolder;
+  final String status;
+  final String? adminNote;
+  final DateTime? requestedAt;
+  final DateTime? processedAt;
+
+  factory WithdrawalRequest.fromJson(Map<String, dynamic> json) {
+    return WithdrawalRequest(
+      id: json['id'] as String,
+      technicianId: json['technician_id'] as String? ?? '',
+      amount: (json['amount'] as num?)?.toDouble() ?? 0,
+      bankName: json['bank_name'] as String? ?? '-',
+      accountNumber: json['account_number'] as String? ?? '-',
+      accountHolder: json['account_holder'] as String? ?? '-',
+      status: json['status'] as String? ?? 'pending',
+      adminNote: json['admin_note'] as String?,
+      requestedAt: DateTime.tryParse('${json['requested_at']}'),
+      processedAt: DateTime.tryParse('${json['processed_at']}'),
     );
   }
 }
@@ -338,6 +396,7 @@ class PaymentCheckout {
     required this.redirectUrl,
     this.token,
     this.reused = false,
+    this.paid = false,
   });
 
   final String paymentId;
@@ -345,6 +404,7 @@ class PaymentCheckout {
   final String redirectUrl;
   final String? token;
   final bool reused;
+  final bool paid;
 
   factory PaymentCheckout.fromJson(Map<String, dynamic> json) {
     return PaymentCheckout(
@@ -353,6 +413,192 @@ class PaymentCheckout {
       redirectUrl: json['redirect_url'] as String? ?? '',
       token: json['token'] as String?,
       reused: json['reused'] as bool? ?? false,
+      paid: json['paid'] as bool? ?? false,
+    );
+  }
+}
+
+class OrderDiagnosis {
+  const OrderDiagnosis({
+    required this.id,
+    required this.orderId,
+    required this.diagnosisResult,
+    required this.serviceCost,
+    required this.sparepartCost,
+    required this.totalCost,
+    this.workEstimation,
+    this.createdAt,
+  });
+
+  final String id;
+  final String orderId;
+  final String diagnosisResult;
+  final String? workEstimation;
+  final double serviceCost;
+  final double sparepartCost;
+  final double totalCost;
+  final DateTime? createdAt;
+
+  factory OrderDiagnosis.fromJson(Map<String, dynamic> json) {
+    return OrderDiagnosis(
+      id: json['id'] as String? ?? '',
+      orderId: json['order_id'] as String? ?? '',
+      diagnosisResult: json['diagnosis_result'] as String? ?? '',
+      workEstimation: json['work_estimation'] as String?,
+      serviceCost: (json['service_cost'] as num?)?.toDouble() ?? 0,
+      sparepartCost: (json['sparepart_cost'] as num?)?.toDouble() ?? 0,
+      totalCost: (json['total_cost'] as num?)?.toDouble() ?? 0,
+      createdAt: DateTime.tryParse('${json['created_at']}'),
+    );
+  }
+}
+
+class OrderSparepart {
+  const OrderSparepart({
+    required this.id,
+    required this.name,
+    required this.quantity,
+    required this.unitPrice,
+  });
+
+  final String id;
+  final String name;
+  final int quantity;
+  final double unitPrice;
+  double get total => quantity * unitPrice;
+
+  factory OrderSparepart.fromJson(Map<String, dynamic> json) {
+    return OrderSparepart(
+      id: json['id'] as String? ?? '',
+      name: json['sparepart_name'] as String? ?? '-',
+      quantity: (json['quantity'] as num?)?.toInt() ?? 1,
+      unitPrice: (json['unit_price'] as num?)?.toDouble() ?? 0,
+    );
+  }
+}
+
+class OrderAttachment {
+  const OrderAttachment({
+    required this.id,
+    required this.fileUrl,
+    this.caption,
+    this.createdAt,
+  });
+
+  final String id;
+  final String fileUrl;
+  final String? caption;
+  final DateTime? createdAt;
+
+  factory OrderAttachment.fromJson(Map<String, dynamic> json) {
+    return OrderAttachment(
+      id: json['id'] as String? ?? '',
+      fileUrl: json['file_url'] as String? ?? '',
+      caption: json['caption'] as String?,
+      createdAt: DateTime.tryParse('${json['created_at']}'),
+    );
+  }
+}
+
+class OrderWorkflowDetail {
+  const OrderWorkflowDetail({
+    this.diagnosis,
+    this.invoice,
+    this.warranty,
+    this.spareparts = const [],
+    this.attachments = const [],
+  });
+
+  final OrderDiagnosis? diagnosis;
+  final List<OrderSparepart> spareparts;
+  final List<OrderAttachment> attachments;
+  final InvoiceSummary? invoice;
+  final WarrantySummary? warranty;
+}
+
+class AppNotification {
+  const AppNotification({
+    required this.id,
+    required this.type,
+    required this.title,
+    required this.message,
+    required this.isRead,
+    this.createdAt,
+  });
+
+  final String id;
+  final String type;
+  final String title;
+  final String message;
+  final bool isRead;
+  final DateTime? createdAt;
+
+  factory AppNotification.fromJson(Map<String, dynamic> json) {
+    return AppNotification(
+      id: json['id'] as String,
+      type: json['type'] as String? ?? 'info',
+      title: json['title'] as String? ?? 'Notifikasi',
+      message: json['message'] as String? ?? '',
+      isRead: json['is_read'] as bool? ?? false,
+      createdAt: DateTime.tryParse('${json['created_at']}'),
+    );
+  }
+}
+
+class InvoiceSummary {
+  const InvoiceSummary({
+    required this.id,
+    required this.orderId,
+    required this.invoiceNumber,
+    required this.totalAmount,
+    this.paymentId,
+    this.invoiceDate,
+  });
+
+  final String id;
+  final String orderId;
+  final String invoiceNumber;
+  final String? paymentId;
+  final DateTime? invoiceDate;
+  final double totalAmount;
+
+  factory InvoiceSummary.fromJson(Map<String, dynamic> json) {
+    return InvoiceSummary(
+      id: json['id'] as String,
+      orderId: json['order_id'] as String? ?? '',
+      invoiceNumber: json['invoice_number'] as String? ?? '-',
+      paymentId: json['payment_id'] as String?,
+      invoiceDate: DateTime.tryParse('${json['invoice_date']}'),
+      totalAmount: (json['total_amount'] as num?)?.toDouble() ?? 0,
+    );
+  }
+}
+
+class WarrantySummary {
+  const WarrantySummary({
+    required this.id,
+    required this.orderId,
+    required this.warrantyNumber,
+    required this.status,
+    this.startDate,
+    this.endDate,
+  });
+
+  final String id;
+  final String orderId;
+  final String warrantyNumber;
+  final String status;
+  final DateTime? startDate;
+  final DateTime? endDate;
+
+  factory WarrantySummary.fromJson(Map<String, dynamic> json) {
+    return WarrantySummary(
+      id: json['id'] as String,
+      orderId: json['order_id'] as String? ?? '',
+      warrantyNumber: json['warranty_number'] as String? ?? '-',
+      status: json['status'] as String? ?? 'active',
+      startDate: DateTime.tryParse('${json['start_date']}'),
+      endDate: DateTime.tryParse('${json['end_date']}'),
     );
   }
 }

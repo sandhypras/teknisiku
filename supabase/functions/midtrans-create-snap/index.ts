@@ -106,7 +106,24 @@ Deno.serve(async (req) => {
       });
     }
     if (existing?.payment_status === "paid") {
-      return json({ error: "Pembayaran order ini sudah lunas" }, 409);
+      if (order.status !== "completed") {
+        const { error: completeError } = await admin.rpc(
+          "complete_order_with_documents",
+          {
+            p_order_id: order.id,
+            p_payment_id: existing.id,
+          },
+        );
+        if (completeError) throw completeError;
+      }
+      return json({
+        payment_id: existing.id,
+        midtrans_order_id: existing.midtrans_order_id,
+        token: existing.snap_token,
+        redirect_url: existing.snap_redirect_url,
+        reused: true,
+        paid: true,
+      });
     }
 
     const payload = {

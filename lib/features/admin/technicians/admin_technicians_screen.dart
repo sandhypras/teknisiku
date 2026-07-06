@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../../shared/widgets/app_feedback.dart';
@@ -41,7 +42,7 @@ class _AdminTechniciansScreenState extends State<AdminTechniciansScreen>
     final q = Supabase.instance.client
         .from('technician_profiles')
         .select(
-          'id, verification_status, verified_at, rejection_reason, skills, service_area, created_at, profile:profiles!user_id(full_name, email, phone), documents:technician_documents(id, document_type, file_url, uploaded_at)',
+          'id, verification_status, verified_at, rejection_reason, skills, service_area, experience, created_at, profile:profiles!user_id(full_name, email, phone), documents:technician_documents(id, document_type, file_url, uploaded_at)',
         );
     final data = status != null
         ? await q
@@ -70,6 +71,7 @@ class _AdminTechniciansScreenState extends State<AdminTechniciansScreen>
     String id, {
     required String serviceArea,
     required String skills,
+    required String experience,
     required String status,
   }) async {
     await Supabase.instance.client
@@ -83,6 +85,7 @@ class _AdminTechniciansScreenState extends State<AdminTechniciansScreen>
               .map((item) => item.trim())
               .where((item) => item.isNotEmpty)
               .toList(),
+          'experience': experience.trim().isEmpty ? null : experience.trim(),
           'verification_status': status,
         })
         .eq('id', id);
@@ -141,12 +144,22 @@ class _AdminTechniciansScreenState extends State<AdminTechniciansScreen>
                   itemCount: list.length,
                   itemBuilder: (_, i) => _TechnicianCard(
                     data: list[i],
-                    onVerify: () =>
-                        _updateStatus(list[i]['id'] as String, 'verified'),
+                    onVerify: () => _confirmStatusChange(
+                      data: list[i],
+                      status: 'verified',
+                      title: 'Verifikasi Teknisi',
+                      message:
+                          'Apakah yakin ingin memverifikasi teknisi ini? Setelah diverifikasi, teknisi dapat menerima pekerjaan dan menambahkan layanan.',
+                    ),
                     onReject: () =>
                         _showRejectDialog(context, list[i]['id'] as String),
-                    onDeactivate: () =>
-                        _updateStatus(list[i]['id'] as String, 'inactive'),
+                    onDeactivate: () => _confirmStatusChange(
+                      data: list[i],
+                      status: 'inactive',
+                      title: 'Nonaktifkan Teknisi',
+                      message:
+                          'Apakah yakin ingin menonaktifkan teknisi ini? Teknisi tidak akan tampil untuk customer.',
+                    ),
                     onViewDocument: _showDocumentPreview,
                     onDetail: () => _showTechnicianDetail(list[i]),
                     onEdit: () => _showTechnicianEdit(list[i]),
@@ -263,9 +276,18 @@ class _AdminTechniciansScreenState extends State<AdminTechniciansScreen>
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               _DetailLine('Email', profile?['email'] as String? ?? '-'),
-              _DetailLine('Telepon', profile?['phone'] as String? ?? '-'),
+              _CopyableDetailLine(
+                'Telepon',
+                profile?['phone'] as String? ?? '-',
+              ),
               _DetailLine('Area', data['service_area'] as String? ?? '-'),
               _DetailLine('Keahlian', skills),
+              _DetailLine(
+                'Pengalaman',
+                (data['experience'] as String?)?.isNotEmpty == true
+                    ? data['experience'] as String
+                    : '-',
+              ),
               _DetailLine(
                 'Status',
                 data['verification_status'] as String? ?? '-',
@@ -311,6 +333,9 @@ class _AdminTechniciansScreenState extends State<AdminTechniciansScreen>
     final skillsCtrl = TextEditingController(
       text: (data['skills'] as List?)?.join(', ') ?? '',
     );
+    final experienceCtrl = TextEditingController(
+      text: data['experience'] as String? ?? '',
+    );
     var status = data['verification_status'] as String? ?? 'pending';
     showDialog(
       context: context,
@@ -331,6 +356,13 @@ class _AdminTechniciansScreenState extends State<AdminTechniciansScreen>
                   decoration: const InputDecoration(
                     labelText: 'Keahlian, pisahkan koma',
                   ),
+                ),
+                TextField(
+                  controller: experienceCtrl,
+                  decoration: const InputDecoration(
+                    labelText: 'Pengalaman',
+                  ),
+                  maxLines: 3,
                 ),
                 const SizedBox(height: 12),
                 DropdownButtonFormField<String>(
@@ -370,6 +402,7 @@ class _AdminTechniciansScreenState extends State<AdminTechniciansScreen>
                   data['id'] as String,
                   serviceArea: areaCtrl.text,
                   skills: skillsCtrl.text,
+                  experience: experienceCtrl.text,
                   status: status,
                 );
               },
@@ -400,6 +433,39 @@ class _AdminTechniciansScreenState extends State<AdminTechniciansScreen>
             },
             style: FilledButton.styleFrom(backgroundColor: AppColors.error),
             child: const Text('Hapus'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _confirmStatusChange({
+    required Map<String, dynamic> data,
+    required String status,
+    required String title,
+    required String message,
+  }) {
+    showDialog(
+      context: context,
+      builder: (_) => AppFeedbackDialog(
+        title: Text(title),
+        content: Text(message),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Batal'),
+          ),
+          FilledButton(
+            onPressed: () {
+              Navigator.pop(context);
+              _updateStatus(data['id'] as String, status);
+              AppFeedback.success(
+                context,
+                title: 'Status diperbarui',
+                message: 'Status teknisi berhasil diubah.',
+              );
+            },
+            child: const Text('Ya, lanjutkan'),
           ),
         ],
       ),
@@ -748,6 +814,55 @@ class _DetailLine extends StatelessWidget {
               style: const TextStyle(fontWeight: FontWeight.w700),
             ),
           ),
+        ],
+      ),
+    );
+  }
+}
+
+class _CopyableDetailLine extends StatelessWidget {
+  const _CopyableDetailLine(this.label, this.value);
+
+  final String label;
+  final String value;
+
+  @override
+  Widget build(BuildContext context) {
+    final canCopy = value.trim().isNotEmpty && value != '-';
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 7),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          SizedBox(
+            width: 92,
+            child: Text(
+              label,
+              style: const TextStyle(color: AppColors.textSecondary),
+            ),
+          ),
+          Expanded(
+            child: Text(
+              value,
+              style: const TextStyle(fontWeight: FontWeight.w700),
+            ),
+          ),
+          if (canCopy)
+            IconButton(
+              tooltip: 'Copy nomor telepon',
+              visualDensity: VisualDensity.compact,
+              onPressed: () async {
+                await Clipboard.setData(ClipboardData(text: value));
+                if (context.mounted) {
+                  AppFeedback.success(
+                    context,
+                    title: 'Nomor disalin',
+                    message: value,
+                  );
+                }
+              },
+              icon: const Icon(Icons.copy_rounded, size: 17),
+            ),
         ],
       ),
     );

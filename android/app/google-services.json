@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "77029809921",
+    "project_id": "siteknisi-a8279",
+    "storage_bucket": "siteknisi-a8279.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:77029809921:android:ef403edbfc437820c0c500",
+        "android_client_info": {
+          "package_name": "com.ti24a6.siteknisi"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCQvatYFqbi23jKfTRsAV_zUFMuIiZXRIg"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

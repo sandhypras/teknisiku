@@ -8,6 +8,7 @@ import '../../core/models/mobile_models.dart';
 import '../../core/services/marketplace_repository.dart';
 import '../../shared/mobile_ui.dart';
 import '../../shared/widgets/app_feedback.dart';
+import '../notifications/notifications_page.dart';
 
 class CustomerOrdersPage extends StatefulWidget {
   const CustomerOrdersPage({required this.repo, super.key});
@@ -37,6 +38,16 @@ class _CustomerOrdersPageState extends State<CustomerOrdersPage> {
     setState(() => _payingOrderId = order.id);
     try {
       final checkout = await widget.repo.createMidtransPayment(order.id);
+      if (checkout.paid) {
+        if (!mounted) return;
+        AppFeedback.success(
+          context,
+          title: 'Pembayaran sudah lunas',
+          message: 'Order sedang diperbarui menjadi selesai.',
+        );
+        _refresh();
+        return;
+      }
       final url = Uri.parse(checkout.redirectUrl);
       final opened = await launchUrl(url, mode: LaunchMode.externalApplication);
       if (!opened) throw StateError('Tidak dapat membuka halaman Midtrans');
@@ -113,9 +124,11 @@ class _CustomerOrdersPageState extends State<CustomerOrdersPage> {
                       _FadeSlideIn(
                         index: 1 + entry.$1,
                         child: _CustomerOrderCard(
+                          repo: widget.repo,
                           order: entry.$2,
                           isPaying: _payingOrderId == entry.$2.id,
                           onPay: () => _startPayment(entry.$2),
+                          onDetail: () => _showOrderDetail(entry.$2),
                         ),
                       ),
                       const SizedBox(height: 16),
@@ -149,6 +162,72 @@ class _CustomerOrdersPageState extends State<CustomerOrdersPage> {
             )
             .toList(),
     };
+  }
+
+  void _showOrderDetail(OrderSummary order) {
+    showModalBottomSheet(
+      context: context,
+      showDragHandle: true,
+      isScrollControlled: true,
+      builder: (context) => SafeArea(
+        child: SingleChildScrollView(
+          padding: EdgeInsets.fromLTRB(
+            20,
+            0,
+            20,
+            MediaQuery.viewInsetsOf(context).bottom + 22,
+          ),
+          child: FutureBuilder<OrderWorkflowDetail>(
+            future: widget.repo.orderWorkflowDetail(order.id),
+            builder: (context, snapshot) {
+              if (snapshot.connectionState == ConnectionState.waiting) {
+                return const SizedBox(
+                  height: 260,
+                  child: Center(child: CircularProgressIndicator()),
+                );
+              }
+              if (snapshot.hasError) {
+                return ErrorState(
+                  message: friendlyErrorMessage(snapshot.error),
+                  onRetry: () => Navigator.pop(context),
+                );
+              }
+              final detail = snapshot.data!;
+              return _CustomerOrderDetailSheet(
+                repo: widget.repo,
+                order: order,
+                detail: detail,
+                onApprove: () => _decidePrice(order, true),
+                onReject: () => _decidePrice(order, false),
+              );
+            },
+          ),
+        ),
+      ),
+    );
+  }
+
+  Future<void> _decidePrice(OrderSummary order, bool approved) async {
+    try {
+      await widget.repo.decideOrderPrice(orderId: order.id, approved: approved);
+      if (!mounted) return;
+      Navigator.pop(context);
+      AppFeedback.success(
+        context,
+        title: approved ? 'Biaya disetujui' : 'Biaya ditolak',
+        message: approved
+            ? 'Teknisi dapat melanjutkan pekerjaan.'
+            : 'Order ditandai sebagai biaya ditolak.',
+      );
+      _refresh();
+    } catch (error) {
+      if (!mounted) return;
+      AppFeedback.error(
+        context,
+        title: 'Gagal memproses biaya',
+        message: friendlyErrorMessage(error),
+      );
+    }
   }
 }
 
@@ -298,6 +377,7 @@ class _PressableScaleState extends State<_PressableScale> {
   @override
   Widget build(BuildContext context) {
     return GestureDetector(
+      onTap: widget.onTap,
       onTapDown: (_) => setState(() => _pressed = true),
       onTapCancel: () => setState(() => _pressed = false),
       onTapUp: (_) => setState(() => _pressed = false),
@@ -433,6 +513,9 @@ class _NotificationButtonState extends State<_NotificationButton> {
   @override
   Widget build(BuildContext context) {
     return GestureDetector(
+      onTap: () => Navigator.of(
+        context,
+      ).push(MaterialPageRoute(builder: (_) => const NotificationsPage())),
       onTapDown: (_) => setState(() => _pressed = true),
       onTapCancel: () => setState(() => _pressed = false),
       onTapUp: (_) => setState(() => _pressed = false),
@@ -658,14 +741,18 @@ class _FriendlyEmptyState extends StatelessWidget {
 
 class _CustomerOrderCard extends StatelessWidget {
   const _CustomerOrderCard({
+    required this.repo,
     required this.order,
     required this.isPaying,
     required this.onPay,
+    required this.onDetail,
   });
 
+  final MarketplaceRepository repo;
   final OrderSummary order;
   final bool isPaying;
   final VoidCallback onPay;
+  final VoidCallback onDetail;
 
   @override
   Widget build(BuildContext context) {
@@ -864,8 +951,13 @@ class _CustomerOrderCard extends StatelessWidget {
                       onPay: onPay,
                     ),
                   ],
+                  if (order.status == 'completed') ...[
+                    const SizedBox(height: 14),
+                    _InvoiceWarrantyPanel(repo: repo, order: order),
+                  ],
                   const SizedBox(height: 14),
                   _PressableScale(
+                    onTap: onDetail,
                     borderRadius: 14,
                     child: Container(
                       height: 50,
@@ -945,6 +1037,544 @@ class _OrderStatusPill extends StatelessWidget {
               fontSize: 13,
             ),
           ),
+        ],
+      ),
+    );
+  }
+}
+
+class _InvoiceWarrantyPanel extends StatelessWidget {
+  const _InvoiceWarrantyPanel({required this.repo, required this.order});
+
+  final MarketplaceRepository repo;
+  final OrderSummary order;
+
+  @override
+  Widget build(BuildContext context) {
+    return FutureBuilder<List<Object?>>(
+      future: Future.wait<Object?>([
+        repo.orderInvoice(order.id),
+        repo.orderWarranty(order.id),
+      ]),
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return const _MiniInfoPanel(
+            icon: Icons.receipt_long_rounded,
+            title: 'Invoice & garansi',
+            message: 'Memuat dokumen layanan...',
+          );
+        }
+        final invoice = snapshot.data?[0] as InvoiceSummary?;
+        final warranty = snapshot.data?[1] as WarrantySummary?;
+        if (invoice == null && warranty == null) {
+          return const _MiniInfoPanel(
+            icon: Icons.verified_user_outlined,
+            title: 'Invoice & garansi belum tersedia',
+            message:
+                'Dokumen akan muncul otomatis setelah admin menyelesaikan data.',
+          );
+        }
+        return Container(
+          padding: const EdgeInsets.all(14),
+          decoration: BoxDecoration(
+            color: const Color(0xFFEAF4FF),
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(color: const Color(0xFFD5E8FF)),
+          ),
+          child: Column(
+            children: [
+              if (invoice != null)
+                _DocumentRow(
+                  icon: Icons.receipt_long_rounded,
+                  title: 'Invoice ${invoice.invoiceNumber}',
+                  subtitle: 'Total ${formatRupiah(invoice.totalAmount)}',
+                ),
+              if (invoice != null && warranty != null)
+                const Divider(height: 18, color: Color(0xFFD5E8FF)),
+              if (warranty != null)
+                _DocumentRow(
+                  icon: Icons.verified_user_rounded,
+                  title: 'Garansi ${warranty.warrantyNumber}',
+                  subtitle: warranty.endDate == null
+                      ? 'Status ${warranty.status}'
+                      : 'Berlaku sampai ${_friendlyDate(warranty.endDate!.toIso8601String().split('T').first)}',
+                ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+}
+
+class _MiniInfoPanel extends StatelessWidget {
+  const _MiniInfoPanel({
+    required this.icon,
+    required this.title,
+    required this.message,
+  });
+
+  final IconData icon;
+  final String title;
+  final String message;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: const Color(0xFFF7FBFF),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: const Color(0xFFE9F0FA)),
+      ),
+      child: _DocumentRow(icon: icon, title: title, subtitle: message),
+    );
+  }
+}
+
+class _DocumentRow extends StatelessWidget {
+  const _DocumentRow({
+    required this.icon,
+    required this.title,
+    required this.subtitle,
+  });
+
+  final IconData icon;
+  final String title;
+  final String subtitle;
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: [
+        Container(
+          width: 42,
+          height: 42,
+          decoration: BoxDecoration(
+            color: Colors.white.withValues(alpha: 0.8),
+            borderRadius: BorderRadius.circular(13),
+          ),
+          child: Icon(icon, color: AppColors.primary),
+        ),
+        const SizedBox(width: 12),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                title,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(
+                  color: AppColors.textPrimary,
+                  fontWeight: FontWeight.w900,
+                ),
+              ),
+              const SizedBox(height: 3),
+              Text(
+                subtitle,
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(
+                  color: AppColors.textSecondary,
+                  fontSize: 12,
+                  fontWeight: FontWeight.w600,
+                  height: 1.25,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _CustomerOrderDetailSheet extends StatefulWidget {
+  const _CustomerOrderDetailSheet({
+    required this.repo,
+    required this.order,
+    required this.detail,
+    required this.onApprove,
+    required this.onReject,
+  });
+
+  final MarketplaceRepository repo;
+  final OrderSummary order;
+  final OrderWorkflowDetail detail;
+  final VoidCallback onApprove;
+  final VoidCallback onReject;
+
+  @override
+  State<_CustomerOrderDetailSheet> createState() =>
+      _CustomerOrderDetailSheetState();
+}
+
+class _CustomerOrderDetailSheetState extends State<_CustomerOrderDetailSheet> {
+  Future<void> _showReviewSheet() async {
+    final comment = TextEditingController();
+    var rating = 5;
+    var loading = false;
+    await showModalBottomSheet<void>(
+      context: context,
+      showDragHandle: true,
+      isScrollControlled: true,
+      builder: (sheetContext) => StatefulBuilder(
+        builder: (sheetContext, setSheetState) {
+          Future<void> submit() async {
+            setSheetState(() => loading = true);
+            try {
+              await widget.repo.submitReview(
+                orderId: widget.order.id,
+                technicianId: widget.order.technicianId,
+                rating: rating,
+                comment: comment.text,
+              );
+              if (!mounted || !sheetContext.mounted) return;
+              Navigator.of(sheetContext).pop();
+              AppFeedback.success(
+                context,
+                title: 'Ulasan dikirim',
+                message: 'Terima kasih, ulasan Anda membantu customer lain.',
+              );
+            } catch (error) {
+              if (!mounted) return;
+              AppFeedback.error(
+                context,
+                title: 'Ulasan gagal dikirim',
+                message: friendlyErrorMessage(error),
+              );
+            } finally {
+              if (mounted) setSheetState(() => loading = false);
+            }
+          }
+
+          return SafeArea(
+            child: Padding(
+              padding: EdgeInsets.fromLTRB(
+                20,
+                0,
+                20,
+                MediaQuery.viewInsetsOf(sheetContext).bottom + 20,
+              ),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text(
+                    'Beri Ulasan',
+                    style: TextStyle(
+                      color: AppColors.textPrimary,
+                      fontSize: 22,
+                      fontWeight: FontWeight.w900,
+                    ),
+                  ),
+                  const SizedBox(height: 14),
+                  Row(
+                    children: List.generate(5, (index) {
+                      final value = index + 1;
+                      return IconButton(
+                        onPressed: () => setSheetState(() => rating = value),
+                        icon: Icon(
+                          value <= rating
+                              ? Icons.star_rounded
+                              : Icons.star_border_rounded,
+                          color: AppColors.warning,
+                          size: 32,
+                        ),
+                      );
+                    }),
+                  ),
+                  const SizedBox(height: 10),
+                  TextField(
+                    controller: comment,
+                    maxLines: 4,
+                    decoration: const InputDecoration(
+                      labelText: 'Komentar',
+                      hintText: 'Ceritakan pengalaman layanan Anda',
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  SizedBox(
+                    width: double.infinity,
+                    height: 52,
+                    child: FilledButton.icon(
+                      onPressed: loading ? null : submit,
+                      icon: loading
+                          ? const SizedBox(
+                              width: 18,
+                              height: 18,
+                              child: CircularProgressIndicator(
+                                strokeWidth: 2,
+                                color: Colors.white,
+                              ),
+                            )
+                          : const Icon(Icons.send_rounded),
+                      label: Text(loading ? 'Mengirim...' : 'Kirim Ulasan'),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          );
+        },
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final order = widget.order;
+    final detail = widget.detail;
+    final diagnosis = detail.diagnosis;
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          order.orderNumber,
+          style: const TextStyle(
+            color: AppColors.textPrimary,
+            fontSize: 23,
+            fontWeight: FontWeight.w900,
+          ),
+        ),
+        const SizedBox(height: 8),
+        StatusPill(
+          label: orderStatusLabel(order.status),
+          color: orderStatusColor(order.status),
+        ),
+        const SizedBox(height: 18),
+        _SheetSection(
+          title: 'Masalah',
+          child: Text(
+            order.problemDescription.isEmpty
+                ? 'Tidak ada deskripsi'
+                : order.problemDescription,
+          ),
+        ),
+        if (diagnosis != null)
+          _SheetSection(
+            title: 'Diagnosis Teknisi',
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(diagnosis.diagnosisResult),
+                if ((diagnosis.workEstimation ?? '').isNotEmpty)
+                  Text('Estimasi: ${diagnosis.workEstimation}'),
+                const SizedBox(height: 8),
+                _CostRow('Biaya jasa', diagnosis.serviceCost),
+                _CostRow('Sparepart', diagnosis.sparepartCost),
+                if (order.serviceFee > 0)
+                  _CostRow('Biaya layanan', order.serviceFee),
+                _CostRow(
+                  'Total final',
+                  order.finalTotal > 0
+                      ? order.finalTotal
+                      : order.estimatedTotal,
+                  bold: true,
+                ),
+              ],
+            ),
+          )
+        else
+          const _SheetSection(
+            title: 'Diagnosis Teknisi',
+            child: Text('Diagnosis belum dikirim oleh teknisi.'),
+          ),
+        if (detail.spareparts.isNotEmpty)
+          _SheetSection(
+            title: 'Sparepart',
+            child: Column(
+              children: [
+                for (final item in detail.spareparts)
+                  _SparepartLine(item: item),
+              ],
+            ),
+          ),
+        if (detail.attachments.isNotEmpty)
+          _SheetSection(
+            title: 'Foto Pekerjaan',
+            child: SizedBox(
+              height: 118,
+              child: ListView.separated(
+                scrollDirection: Axis.horizontal,
+                itemCount: detail.attachments.length,
+                separatorBuilder: (_, _) => const SizedBox(width: 10),
+                itemBuilder: (context, index) {
+                  final attachment = detail.attachments[index];
+                  return ClipRRect(
+                    borderRadius: BorderRadius.circular(16),
+                    child: Stack(
+                      children: [
+                        Image.network(
+                          attachment.fileUrl,
+                          width: 132,
+                          height: 118,
+                          fit: BoxFit.cover,
+                          errorBuilder: (_, _, _) => Container(
+                            width: 132,
+                            height: 118,
+                            color: const Color(0xFFEAF4FF),
+                            child: const Icon(Icons.broken_image_rounded),
+                          ),
+                        ),
+                        Positioned(
+                          left: 8,
+                          right: 8,
+                          bottom: 8,
+                          child: Text(
+                            attachment.caption ?? 'Foto',
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontWeight: FontWeight.w900,
+                              fontSize: 11,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  );
+                },
+              ),
+            ),
+          ),
+        if (detail.invoice != null || detail.warranty != null)
+          _SheetSection(
+            title: 'Invoice & Garansi',
+            child: Column(
+              children: [
+                if (detail.invoice != null)
+                  _DocumentRow(
+                    icon: Icons.receipt_long_rounded,
+                    title: 'Invoice ${detail.invoice!.invoiceNumber}',
+                    subtitle: formatRupiah(detail.invoice!.totalAmount),
+                  ),
+                if (detail.invoice != null && detail.warranty != null)
+                  const Divider(),
+                if (detail.warranty != null)
+                  _DocumentRow(
+                    icon: Icons.verified_user_rounded,
+                    title: 'Garansi ${detail.warranty!.warrantyNumber}',
+                    subtitle: detail.warranty!.endDate == null
+                        ? detail.warranty!.status
+                        : 'Sampai ${_friendlyDate(detail.warranty!.endDate!.toIso8601String().split('T').first)}',
+                  ),
+              ],
+            ),
+          ),
+        if (order.status == 'waiting_price_approval') ...[
+          const SizedBox(height: 10),
+          Row(
+            children: [
+              Expanded(
+                child: OutlinedButton.icon(
+                  onPressed: widget.onReject,
+                  icon: const Icon(Icons.close_rounded),
+                  label: const Text('Tolak Biaya'),
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: FilledButton.icon(
+                  onPressed: widget.onApprove,
+                  icon: const Icon(Icons.check_rounded),
+                  label: const Text('Setujui Biaya'),
+                ),
+              ),
+            ],
+          ),
+        ],
+        if (order.status == 'completed') ...[
+          const SizedBox(height: 12),
+          SizedBox(
+            width: double.infinity,
+            child: FilledButton.icon(
+              onPressed: _showReviewSheet,
+              icon: const Icon(Icons.star_rounded),
+              label: const Text('Beri Ulasan Teknisi'),
+            ),
+          ),
+        ],
+      ],
+    );
+  }
+}
+
+class _SheetSection extends StatelessWidget {
+  const _SheetSection({required this.title, required this.child});
+
+  final String title;
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      margin: const EdgeInsets.only(bottom: 14),
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: const Color(0xFFE4ECF6)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            title,
+            style: const TextStyle(
+              color: AppColors.textPrimary,
+              fontWeight: FontWeight.w900,
+            ),
+          ),
+          const SizedBox(height: 8),
+          child,
+        ],
+      ),
+    );
+  }
+}
+
+class _CostRow extends StatelessWidget {
+  const _CostRow(this.label, this.amount, {this.bold = false});
+
+  final String label;
+  final double amount;
+  final bool bold;
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: [
+        Expanded(child: Text(label)),
+        Text(
+          formatRupiah(amount),
+          style: TextStyle(
+            color: AppColors.primary,
+            fontWeight: bold ? FontWeight.w900 : FontWeight.w700,
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _SparepartLine extends StatelessWidget {
+  const _SparepartLine({required this.item});
+
+  final OrderSparepart item;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 6),
+      child: Row(
+        children: [
+          Expanded(child: Text('${item.name} x${item.quantity}')),
+          Text(formatRupiah(item.total)),
         ],
       ),
     );

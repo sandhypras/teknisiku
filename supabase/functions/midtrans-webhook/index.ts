@@ -43,11 +43,14 @@ Deno.serve(async (req) => {
     if (paymentError) throw paymentError;
 
     if (paymentStatus === "paid") {
-      await admin
-        .from("orders")
-        .update({ status: "completed" })
-        .eq("id", payment.order_id)
-        .eq("status", "waiting_payment");
+      const { error: completeError } = await admin.rpc(
+        "complete_order_with_documents",
+        {
+          p_order_id: payment.order_id,
+          p_payment_id: payment.id,
+        },
+      );
+      if (completeError) throw completeError;
     }
 
     return json({ ok: true, payment_status: paymentStatus });

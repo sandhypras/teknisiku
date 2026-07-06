@@ -1,4 +1,4 @@
-package com.example.teknisiku
+package com.ti24a6.siteknisi
 
 import io.flutter.embedding.android.FlutterActivity
 
