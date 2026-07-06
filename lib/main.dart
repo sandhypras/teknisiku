@@ -37,7 +37,7 @@ Future<void> main() async {
       // ignore: deprecated_member_use
       anonKey: AppConfig.supabaseAnonKey,
       authOptions: const FlutterAuthClientOptions(
-        authFlowType: AuthFlowType.pkce,
+        authFlowType: AuthFlowType.implicit,
       ),
     );
   }
