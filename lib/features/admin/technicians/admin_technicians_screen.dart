@@ -42,7 +42,7 @@ class _AdminTechniciansScreenState extends State<AdminTechniciansScreen>
     final q = Supabase.instance.client
         .from('technician_profiles')
         .select(
-          'id, verification_status, verified_at, rejection_reason, skills, service_area, created_at, profile:profiles!user_id(full_name, email, phone), documents:technician_documents(id, document_type, file_url, uploaded_at)',
+          'id, verification_status, verified_at, rejection_reason, skills, service_area, experience, created_at, profile:profiles!user_id(full_name, email, phone), documents:technician_documents(id, document_type, file_url, uploaded_at)',
         );
     final data = status != null
         ? await q
@@ -71,6 +71,7 @@ class _AdminTechniciansScreenState extends State<AdminTechniciansScreen>
     String id, {
     required String serviceArea,
     required String skills,
+    required String experience,
     required String status,
   }) async {
     await Supabase.instance.client
@@ -84,6 +85,7 @@ class _AdminTechniciansScreenState extends State<AdminTechniciansScreen>
               .map((item) => item.trim())
               .where((item) => item.isNotEmpty)
               .toList(),
+          'experience': experience.trim().isEmpty ? null : experience.trim(),
           'verification_status': status,
         })
         .eq('id', id);
@@ -281,6 +283,12 @@ class _AdminTechniciansScreenState extends State<AdminTechniciansScreen>
               _DetailLine('Area', data['service_area'] as String? ?? '-'),
               _DetailLine('Keahlian', skills),
               _DetailLine(
+                'Pengalaman',
+                (data['experience'] as String?)?.isNotEmpty == true
+                    ? data['experience'] as String
+                    : '-',
+              ),
+              _DetailLine(
                 'Status',
                 data['verification_status'] as String? ?? '-',
               ),
@@ -325,6 +333,9 @@ class _AdminTechniciansScreenState extends State<AdminTechniciansScreen>
     final skillsCtrl = TextEditingController(
       text: (data['skills'] as List?)?.join(', ') ?? '',
     );
+    final experienceCtrl = TextEditingController(
+      text: data['experience'] as String? ?? '',
+    );
     var status = data['verification_status'] as String? ?? 'pending';
     showDialog(
       context: context,
@@ -345,6 +356,13 @@ class _AdminTechniciansScreenState extends State<AdminTechniciansScreen>
                   decoration: const InputDecoration(
                     labelText: 'Keahlian, pisahkan koma',
                   ),
+                ),
+                TextField(
+                  controller: experienceCtrl,
+                  decoration: const InputDecoration(
+                    labelText: 'Pengalaman',
+                  ),
+                  maxLines: 3,
                 ),
                 const SizedBox(height: 12),
                 DropdownButtonFormField<String>(
@@ -384,6 +402,7 @@ class _AdminTechniciansScreenState extends State<AdminTechniciansScreen>
                   data['id'] as String,
                   serviceArea: areaCtrl.text,
                   skills: skillsCtrl.text,
+                  experience: experienceCtrl.text,
                   status: status,
                 );
               },
